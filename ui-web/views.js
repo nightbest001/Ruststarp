@@ -89,13 +89,19 @@ function Settings(prev){
 
   /* --- status bar --- */
   const saveBtn=Btn(t('Menu.Save'),{kind:'primary',onclick:save});
-  const status=h('div',{class:'status'},h('div',{class:'l'}),saveBtn,Btn(t('Common.Close'),{onclick:()=>closeWin()}));
+  const playBtn=Btn(t('X.Play'),{enabled:()=>D.installed,onclick:()=>play()});
+  const status=h('div',{class:'status'},h('div',{class:'l'}),saveBtn,playBtn,Btn(t('Common.Close'),{onclick:()=>closeWin()}));
+  /* save first when there are unsaved changes, then start Roblox */
+  async function play(){
+    if(dirty()&&!(await save()))return;
+    try{await call('launch',{arg:'-player'})}catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
   async function save(){
     try{const r=await call('save',{settings:S.s,force_reinstall:S.force,flags:S.flags,shortcuts:S.sc});
       saved=snap();touch();
       if(r&&r.failed&&r.failed.length)snack({title:t('Menu.Save'),msg:r.failed.join('\n'),kind:'bad',icon:'Info20',timeout:6000});
-      else snack({title:t('Menu.SettingsSaved.Title'),msg:t('Menu.SettingsSaved.Message'),kind:'ok',icon:'CheckmarkCircle32'})}
-    catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      else snack({title:t('Menu.SettingsSaved.Title'),msg:t('Menu.SettingsSaved.Message'),kind:'ok',icon:'CheckmarkCircle32'});
+      return !(r&&r.failed&&r.failed.length)}
+    catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000});return false}}
   async function closeWin(){
     if(dirty()){const ok=await confirmBox(t('Common.Warning'),t('Menu.UnsavedChanges'));if(!ok)return}
     call('win',{op:'close',force:true})}
@@ -126,9 +132,9 @@ function Settings(prev){
           h('div',{style:{marginTop:'8px'}},Check(t('Menu.Integrations.Custom.AutoClose'),()=>c.auto_close,v=>c.auto_close=v)))};
       const act=()=>S.s.enable_activity_tracking;
       const el=pg(dsc('Menu.Integrations.Description'),sec('Menu.Integrations.ActivityTracking'),
-        Option({header:t('Menu.Integrations.EnableActivityTracking.Title'),desc:t('Menu.Integrations.EnableActivityTracking.Description'),help:WIKI+'/features/activity-tracking/',content:Toggle(()=>S.s.enable_activity_tracking,v=>S.s.enable_activity_tracking=v)}),
-        Option({header:t('Menu.Integrations.DesktopApp.Title'),desc:t('Menu.Integrations.DesktopApp.Description',WIKI+'/features/dont-exit-to-desktop-app/'),help:WIKI+'/features/dont-exit-to-desktop-app/',enabled:act,content:Toggle(()=>S.s.use_disable_app_patch,v=>S.s.use_disable_app_patch=v)}),
-        sec('X.Rpc.Title'),h('div',{class:'desc',style:{margin:0}},md('X.Rpc.Description',WIKI+'/features/discord-rich-presence/')),
+        Option({header:t('Menu.Integrations.EnableActivityTracking.Title'),desc:t('Menu.Integrations.EnableActivityTracking.Description'),content:Toggle(()=>S.s.enable_activity_tracking,v=>S.s.enable_activity_tracking=v)}),
+        Option({header:t('Menu.Integrations.DesktopApp.Title'),desc:t('Menu.Integrations.DesktopApp.Description'),enabled:act,content:Toggle(()=>S.s.use_disable_app_patch,v=>S.s.use_disable_app_patch=v)}),
+        sec('X.Rpc.Title'),h('div',{class:'desc',style:{margin:0}},md('X.Rpc.Description')),
         Option({header:t('X.Rpc.Show.Title'),desc:t('X.Rpc.Show.Description'),enabled:act,content:Toggle(()=>S.s.use_discord_rich_presence,v=>S.s.use_discord_rich_presence=v)}),
         Option({header:t('X.Rpc.Join.Title'),desc:t('X.Rpc.Join.Description'),enabled:()=>act()&&S.s.use_discord_rich_presence,content:Toggle(()=>S.s.allow_activity_joining,v=>S.s.allow_activity_joining=v)}),
         Option({header:t('X.Rpc.Account.Title'),desc:t('X.Rpc.Account.Description'),enabled:()=>act()&&S.s.use_discord_rich_presence,content:Toggle(()=>S.s.show_account_on_rich_presence,v=>S.s.show_account_on_rich_presence=v)}),
@@ -144,9 +150,7 @@ function Settings(prev){
       Option({header:t('X.Behaviour.KeepPackages.Title'),desc:t('X.Behaviour.KeepPackages.Description'),content:Toggle(()=>S.s.debug_disable_version_package_cleanup,v=>S.s.debug_disable_version_package_cleanup=v)}))},
 
     mods(){return pg(dsc('Menu.Mods.Description'),
-      h('div',{class:'grid2'},
-        CardAction({icon:'Folder24',title:t('Menu.Mods.OpenModsFolder.Title'),desc:t('Menu.Mods.OpenModsFolder.Description'),onclick:()=>call('open_folder',{which:'mods'})}),
-        CardAction({icon:'BookQuestionMark24',title:t('Common.Help'),desc:t('Menu.Mods.Help.Description'),onclick:()=>openUrl(WIKI+'/features/mods/')})),
+      CardAction({icon:'Folder24',title:t('Menu.Mods.OpenModsFolder.Title'),desc:t('Menu.Mods.OpenModsFolder.Description'),onclick:()=>call('open_folder',{which:'mods'})}),
       Card(h('div',{style:{fontSize:'14px'}},t('X.Mods.How.Title')),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px',lineHeight:1.4}},
         t('X.Mods.How.Text',NAME))))},
 
@@ -276,10 +280,7 @@ function AboutBody(){
     h('div',{class:'hero',style:{marginBottom:'8px'}},h('img',{src:window.APP_ICON,alt:''}),h('div',null,h('div',{style:{fontSize:'28px',fontWeight:600}},NAME),h('div',{class:'t3'},t('Menu.About.Version',D.version)))),
     h('div',{class:'desc'},t('Menu.About.Description')),
     h('div',{class:'h2'},t('Menu.About.HelpInformation')),
-    h('div',{class:'grid2'},link('Code24',t('Menu.About.GithubRepository'),D.links.repo),link('BookQuestionMark24',t('Menu.About.ReportIssue'),D.links.issues)),
-    Expander({icon:'Heart24',title:t('Menu.About.Licenses'),open:false,body:h('div',null,
-      h('div',null,t('X.About.Rust',NAME)),h('div',{class:'t3',style:{marginTop:'6px',fontSize:'12px',lineHeight:1.45}},t('X.About.License')),
-      h('div',{style:{marginTop:'8px'}},h('a',{class:'lnk',onclick:()=>openUrl('https://github.com/bloxstraplabs/bloxstrap')},t('X.About.BloxLink'))))}))}
+    h('div',{class:'grid2'},link('Code24',t('Menu.About.GithubRepository'),D.links.repo),link('BookQuestionMark24',t('Menu.About.ReportIssue'),D.links.issues)))}
 
 /* =========================================================== BOOT DIALOG (Fluent) */
 function BootView(o){
