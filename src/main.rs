@@ -110,7 +110,7 @@ fn real_main() -> i32 {
         if !paths::running_installed_copy() {
             return ui::setup::run();
         }
-        return ui::settings::run();
+        return ui::home::run();
     }
 
     app::set_launch(LaunchSettings::parse(args));

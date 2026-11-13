@@ -1,5 +1,6 @@
 //! egui front end: the settings window and the launch (progress) window, in Rust-orange.
 
+pub mod home;
 pub mod launch;
 pub mod pages;
 pub mod settings;
