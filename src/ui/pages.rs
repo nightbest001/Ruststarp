@@ -442,7 +442,7 @@ impl SettingsApp {
             |ui| {
                 if primary_button(ui, if installed { "Repair" } else { "Install" }).clicked() {
                     let code = installer::install(true);
-                    if code == crate::app::error_code::clr_success() {
+                    if code == crate::app::error_code::SUCCESS {
                         self.installed = true;
                         self.say("Ruststrap installed", true);
                     } else {

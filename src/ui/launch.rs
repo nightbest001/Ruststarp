@@ -64,7 +64,7 @@ impl eframe::App for LaunchApp {
 
         if let Some(code) = snap.finished {
             // success or the user cancelled: nothing more to say
-            if code == error_code::clr_success() || progress::cancelled() {
+            if code == error_code::SUCCESS || progress::cancelled() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
         }

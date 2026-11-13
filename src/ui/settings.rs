@@ -277,7 +277,7 @@ impl SettingsApp {
         match (kind, act) {
             (0, 1) => {
                 let code = installer::uninstall(true, false);
-                if code == app::error_code::clr_success() {
+                if code == app::error_code::SUCCESS {
                     self.force_close = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 } else {
