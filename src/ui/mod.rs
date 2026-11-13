@@ -1,37 +1,31 @@
-//! egui front end: the settings window and the launch (progress) window, in Rust-orange.
+//! Front end: one web page (see `web.rs`) shown in a WebView2 window for every screen.
 
-pub mod home;
-pub mod launch;
-pub mod pages;
-pub mod settings;
-pub mod setup;
-pub mod theme;
-pub mod widgets;
+pub mod web;
 
-use eframe::egui;
+use crate::models::LaunchMode;
+use web::Mode;
 
-const ICON_PNG: &[u8] = include_bytes!("../../assets/Ruststrap-256.png");
-
-pub fn icon_data() -> egui::IconData {
-    eframe::icon_data::from_png_bytes(ICON_PNG).unwrap_or_default()
+/// Setup wizard (shown when Ruststrap is started from outside its install folder).
+pub mod setup {
+    pub fn run() -> i32 {
+        super::web::run(super::Mode::Setup)
+    }
 }
-
-pub fn icon_texture(ctx: &egui::Context) -> egui::TextureHandle {
-    let d = icon_data();
-    let img = egui::ColorImage::from_rgba_unmultiplied([d.width as usize, d.height as usize], &d.rgba);
-    ctx.load_texture("ruststrap-icon", img, egui::TextureOptions::LINEAR)
+/// The launch menu you get when you open the installed app with no arguments.
+pub mod home {
+    pub fn run() -> i32 {
+        super::web::run(super::Mode::Home)
+    }
 }
-
-pub fn native_options(title: &str, size: [f32; 2], min: [f32; 2], resizable: bool, decorations: bool) -> eframe::NativeOptions {
-    eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title(title)
-            .with_inner_size(size)
-            .with_min_inner_size(min)
-            .with_resizable(resizable)
-            .with_decorations(decorations)
-            .with_icon(icon_data()),
-        centered: true,
-        ..Default::default()
+/// The settings window.
+pub mod settings {
+    pub fn run() -> i32 {
+        super::web::run(super::Mode::Settings)
+    }
+}
+/// The progress window shown while Roblox is installed / updated / started.
+pub mod launch {
+    pub fn run(mode: super::LaunchMode) -> i32 {
+        super::web::run(super::Mode::Launch(mode))
     }
 }

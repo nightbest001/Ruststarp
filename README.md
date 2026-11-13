@@ -16,7 +16,7 @@ Bukan produk resmi Roblox.
 |---|---|---|
 | Bahasa | C# (.NET 6, WPF) | Rust |
 | Kebutuhan | .NET Desktop Runtime | tidak ada |
-| Antarmuka | jendela dan tray | jendela (egui), tanpa tray |
+| Antarmuka | jendela dan tray | jendela (WebView2, HTML/CSS/JS), tanpa tray |
 | Pengaturan | layar settings | jendela pengaturan, atau file JSON dan perintah `flags` |
 | Discord Rich Presence | ada | dihapus |
 | Pilih GPU (dropdown) | tidak ada | ada |

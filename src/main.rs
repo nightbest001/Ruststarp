@@ -1,7 +1,7 @@
 //! Ruststrap: a Rust port of Bloxstrap (https://github.com/bloxstraplabs/bloxstrap).
 //!
-//! The window UI (settings + launch progress) follows Bloxstrap's layout, drawn with egui in a Rust-orange
-//! theme. It is a GUI-subsystem program: no terminal opens on double-click or from a roblox:// link. When it
+//! The window UI (settings, launch menu, launch progress, setup) is one HTML/CSS/JS page shown in a WebView2
+//! window, so layout, icons and animation match Bloxstrap's WPF-UI. It is a GUI-subsystem program: no terminal opens on double-click or from a roblox:// link. When it
 //! is started from cmd/PowerShell with a subcommand, it borrows that console for the text output.
 //!
 //! Differences from the original: no Discord Rich Presence (removed), no bootstrapper styles / languages, no in-app updater.

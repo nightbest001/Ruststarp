@@ -87,6 +87,11 @@ pub fn launch() -> &'static LaunchSettings {
     LAUNCH.get().expect("launch settings not set")
 }
 
+/// `None` for windows that are opened without launch arguments (settings, setup).
+pub fn launch_opt() -> Option<&'static LaunchSettings> {
+    LAUNCH.get()
+}
+
 pub fn http() -> &'static reqwest::blocking::Client {
     HTTP.get_or_init(|| {
         reqwest::blocking::Client::builder()
