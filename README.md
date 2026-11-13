@@ -25,6 +25,7 @@ Bukan produk resmi Roblox.
 | Export diagnostic data | ada | ada |
 | Multi Account (beberapa akun, beberapa jendela Roblox) | tidak ada | ada: halaman Multi Account |
 | Tetap di System Tray setelah Roblox jalan | tidak ada | ada (bisa dimatikan di Behaviour) |
+| Overlay CPU / GPU / RAM di atas game (latar transparan) | tidak ada | ada: Pengaturan > Integrasi |
 | Update diri sendiri | ada | ada: banner di dalam app, tanpa unduh lewat browser |
 | Uninstall | Apps & Features dan tombol di app | sama: Apps & Features, tombol di app, atau `ruststrap uninstall` |
 
@@ -145,7 +146,7 @@ src/models.rs            Settings, State, manifest paket
 
 ## Yang belum ada
 
-Ikon di tray, gaya bootstrapper dan ikon kustom, bahasa, analytics, extract ikon, preset mod
+Gaya bootstrapper dan ikon kustom, bahasa, analytics, extract ikon, preset mod
 (emoji, kursor, font), updater latar, dan pemasangan WebView2 otomatis.
 
 ## Build
@@ -183,3 +184,12 @@ Di Settings > Mods > Lain-lain: **Pilih font...** (file `.ttf` atau `.otf`) meng
 - Sebelum ada yang diubah, file font asli Roblox dicadangkan ke `FontBackup\<versi>\`. Saat font dihapus, file asli dikembalikan dari cadangan.
 - File dicek dulu (tabel `head`, `cmap`, `name`, outline). Kalau bukan font yang valid, ditolak.
 - Berlaku saat Roblox dijalankan lewat Ruststrap berikutnya.
+
+## Overlay performa
+
+Di Pengaturan > Integrasi ada tiga toggle: **Tampilkan CPU**, **Tampilkan GPU**, **Tampilkan RAM**. Kalau salah satu aktif,
+proses kecil `ruststrap -overlay` jalan bareng Roblox dan menampilkan teks di pojok kiri atas layar. Latarnya transparan
+penuh, klik tembus ke game, dan jendelanya menutup sendiri setelah Roblox tutup. Tombol **Pratinjau** menampilkannya 8 detik.
+
+- CPU dari `GetSystemTimes`, RAM dari `GlobalMemoryStatusEx`, GPU dari counter `\GPU Engine(*)\Utilization Percentage` (sama seperti Task Manager, Windows 10 1709 ke atas).
+- Cuma tampil di mode jendela dan borderless, tidak di atas layar penuh eksklusif.

@@ -36,6 +36,7 @@ mod logger;
 mod login;
 mod menu;
 mod models;
+mod overlay;
 mod paths;
 mod progress;
 mod diagnostics;
@@ -93,6 +94,8 @@ fn real_main() -> i32 {
         "Watcher"
     } else if args.iter().any(|a| a == "-tray") {
         "Tray"
+    } else if args.iter().any(|a| a == "-overlay") {
+        "Overlay"
     } else if args.iter().any(|a| a == "-accountlogin") {
         "Login"
     } else {
@@ -160,6 +163,9 @@ fn real_main() -> i32 {
     }
     if launch.active("tray") {
         return tray::run();
+    }
+    if launch.active("overlay") {
+        return overlay::run();
     }
     if launch.active("accountlogin") {
         return match launch.data("accountlogin") {

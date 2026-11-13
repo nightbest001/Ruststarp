@@ -9,6 +9,7 @@ const FLAGS: &[(&str, &[&str])] = &[
     ("menu", &["preferences", "menu", "settings"]),
     ("watcher", &["watcher"]),
     ("tray", &["tray"]),
+    ("overlay", &["overlay"]),
     ("accountlogin", &["accountlogin"]),
     ("backgroundupdater", &["backgroundupdater"]),
     ("quiet", &["quiet"]),

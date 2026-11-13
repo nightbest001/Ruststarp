@@ -745,6 +745,18 @@ impl Bootstrapper {
                 crate::log!(IDENT, "Failed to start the watcher: {e}");
             }
         }
+        // performance overlay (CPU / GPU / RAM), its own small process
+        let show_overlay = {
+            let s = app::settings();
+            s.prop.show_cpu || s.prop.show_gpu || s.prop.show_ram
+        };
+        if show_overlay {
+            let mut o = Command::new(paths::process());
+            o.arg("-overlay").creation_flags(CREATE_NO_WINDOW);
+            if let Err(e) = o.spawn() {
+                crate::log!(IDENT, "Failed to start the overlay: {e}");
+            }
+        }
         thread::sleep(Duration::from_secs(1));
         Ok(())
     }

@@ -127,6 +127,9 @@ fn settings_to_json(s: &Settings) -> Value {
         "show_account_on_rich_presence": s.show_account_on_rich_presence,
         "keep_in_tray": s.keep_in_tray,
         "multi_instance": s.multi_instance,
+        "show_cpu": s.show_cpu,
+        "show_gpu": s.show_gpu,
+        "show_ram": s.show_ram,
         "gpu_preference": s.gpu_preference,
         "theme": s.theme,
         "language": s.language,
@@ -149,6 +152,9 @@ fn apply_settings_json(s: &mut Settings, v: &Value) {
     s.show_account_on_rich_presence = b("show_account_on_rich_presence", s.show_account_on_rich_presence);
     s.keep_in_tray = b("keep_in_tray", s.keep_in_tray);
     s.multi_instance = b("multi_instance", s.multi_instance);
+    s.show_cpu = b("show_cpu", s.show_cpu);
+    s.show_gpu = b("show_gpu", s.show_gpu);
+    s.show_ram = b("show_ram", s.show_ram);
     s.debug_disable_version_package_cleanup =
         b("debug_disable_version_package_cleanup", s.debug_disable_version_package_cleanup);
     s.gpu_preference = st("gpu_preference", &s.gpu_preference.clone());
@@ -359,6 +365,14 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
             Ok(Value::Null)
         }
         "save" => save(a),
+        "overlay_preview" => {
+            Command::new(paths::process())
+                .args(["-overlay", "preview"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+            Ok(Value::Null)
+        }
         "open_url" => {
             open_url(arg_str(a, "url"));
             Ok(Value::Null)

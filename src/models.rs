@@ -51,6 +51,10 @@ pub struct Settings {
     pub keep_in_tray: bool,
     /// Let several Roblox windows run at once (Multi Account).
     pub multi_instance: bool,
+    /// Performance overlay on top of the game (see `overlay.rs`).
+    pub show_cpu: bool,
+    pub show_gpu: bool,
+    pub show_ram: bool,
     /// Last game used in Multi Account (not edited by the settings page).
     pub account_place: String,
     pub account_job: String,
@@ -79,6 +83,9 @@ impl Default for Settings {
             show_account_on_rich_presence: false,
             keep_in_tray: true,
             multi_instance: true,
+            show_cpu: false,
+            show_gpu: false,
+            show_ram: false,
             account_place: String::new(),
             account_job: String::new(),
             gpu_preference: "default".to_string(),

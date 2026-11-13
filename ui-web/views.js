@@ -138,6 +138,13 @@ function Settings(prev){
         Option({header:t('X.Rpc.Show.Title'),desc:t('X.Rpc.Show.Description'),enabled:act,content:Toggle(()=>S.s.use_discord_rich_presence,v=>S.s.use_discord_rich_presence=v)}),
         Option({header:t('X.Rpc.Join.Title'),desc:t('X.Rpc.Join.Description'),enabled:()=>act()&&S.s.use_discord_rich_presence,content:Toggle(()=>S.s.allow_activity_joining,v=>S.s.allow_activity_joining=v)}),
         Option({header:t('X.Rpc.Account.Title'),desc:t('X.Rpc.Account.Description'),enabled:()=>act()&&S.s.use_discord_rich_presence,content:Toggle(()=>S.s.show_account_on_rich_presence,v=>S.s.show_account_on_rich_presence=v)}),
+        sec('X.Ov.Title'),h('div',{class:'desc',style:{margin:0}},t('X.Ov.Description')),
+        Option({header:t('X.Ov.Cpu.Title'),desc:t('X.Ov.Cpu.Desc'),content:Toggle(()=>S.s.show_cpu,v=>S.s.show_cpu=v)}),
+        Option({header:t('X.Ov.Gpu.Title'),desc:t('X.Ov.Gpu.Desc'),content:Toggle(()=>S.s.show_gpu,v=>S.s.show_gpu=v)}),
+        Option({header:t('X.Ov.Ram.Title'),desc:t('X.Ov.Ram.Desc'),content:Toggle(()=>S.s.show_ram,v=>S.s.show_ram=v)}),
+        Option({header:t('X.Ov.Preview.Title'),desc:t('X.Ov.Preview.Desc'),content:Btn(t('X.Ov.Preview.Btn'),{icon:'Play28',onclick:async()=>{
+          if(dirty()&&!(await save()))return;
+          try{await call('overlay_preview')}catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}})}),
         sec('Menu.Integrations.Custom.Title'),h('div',{class:'desc',style:{margin:0}},t('Menu.Integrations.Custom.Description')),
         h('div',{class:'cint'},h('div',{class:'lcol'},list,h('div',{class:'btnrow',style:{margin:0}},
           Btn(t('Common.New'),{icon:'Add28',onclick:()=>{S.s.custom_integrations.push({name:t('Menu.Integrations.Custom.NewIntegration'),location:'',launch_args:'',auto_close:true});S.sel=S.s.custom_integrations.length-1;paint();touch()}}),
