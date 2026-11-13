@@ -1,7 +1,10 @@
 /* core: helpers, bridge, i18n, theme, controls */
 (function(){
 const NS='http://www.w3.org/2000/svg';
-const STR=window.STRINGS||{};
+const EN=window.STRINGS||{};const ID=window.STRINGS_ID||{};let STR=EN;
+/* language: texts missing from the Indonesian table fall back to English */
+window.setLang=function(code){STR=code==='id'?Object.assign({},EN,ID):EN};
+window.effLang=function(pref,sys){return pref==='id'||pref==='en'?pref:(sys==='id'?'id':'en')};
 window.t=function(k,...a){let s=STR[k];if(s==null)s=k;return s.replace(/\{(\d+)\}/g,(m,i)=>a[i]!=null?a[i]:m)};
 window.h=function(tag,props,...kids){
   const el=document.createElement(tag);
@@ -125,9 +128,9 @@ window.confirmBox=(title,body,yes,no)=>dialog({title,body,buttons:[{label:yes||t
 window.TitleBar=function(o){
   const bar=h('div',{class:'titlebar'},
     h('div',{class:'drag',ondblclick:()=>o.max&&call('win',{op:'max'})},h('img',{src:window.APP_ICON,alt:''}),h('span',null,o.title)));
-  if(o.min)bar.append(h('div',{class:'tb-btn',title:'Minimize',onclick:()=>call('win',{op:'min'})},''));
-  if(o.max){const m=h('div',{class:'tb-btn',title:'Maximize',onclick:()=>call('win',{op:'max'})},'');bar.append(m);window.addEventListener('resize',()=>{m.textContent=(innerWidth>=screen.availWidth-16&&innerHeight>=screen.availHeight-16)?'':''})}
-  if(o.close!==false)bar.append(h('div',{class:'tb-btn close',title:'Close',onclick:o.onclose||(()=>call('win',{op:'close'}))},''));
+  if(o.min)bar.append(h('div',{class:'tb-btn',title:t('X.Win.Min'),onclick:()=>call('win',{op:'min'})},''));
+  if(o.max){const m=h('div',{class:'tb-btn',title:t('X.Win.Max'),onclick:()=>call('win',{op:'max'})},'');bar.append(m);window.addEventListener('resize',()=>{m.textContent=(innerWidth>=screen.availWidth-16&&innerHeight>=screen.availHeight-16)?'':''})}
+  if(o.close!==false)bar.append(h('div',{class:'tb-btn close',title:t('Common.Close'),onclick:o.onclose||(()=>call('win',{op:'close'}))},''));
   return bar};
 window.ResizeHandles=function(){
   const f=document.createDocumentFragment();

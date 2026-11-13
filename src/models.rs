@@ -42,10 +42,17 @@ pub struct Settings {
     pub use_fast_flag_manager: bool,
     pub enable_activity_tracking: bool,
     pub use_disable_app_patch: bool,
+    /// Discord Rich Presence (needs activity tracking).
+    pub use_discord_rich_presence: bool,
+    /// Shows a "Join server" button on the presence.
+    pub allow_activity_joining: bool,
+    pub show_account_on_rich_presence: bool,
     /// "default" | "saving" | "high"; see `gpu.rs`.
     pub gpu_preference: String,
     /// "system" | "light" | "dark"
     pub theme: String,
+    /// "system" | "en" | "id"; see `lang.rs`.
+    pub language: String,
     /// Text shown as the title of the launch window.
     pub bootstrapper_title: String,
     pub debug_disable_version_package_cleanup: bool,
@@ -60,8 +67,12 @@ impl Default for Settings {
             use_fast_flag_manager: true,
             enable_activity_tracking: true,
             use_disable_app_patch: false,
+            use_discord_rich_presence: true,
+            allow_activity_joining: true,
+            show_account_on_rich_presence: false,
             gpu_preference: "default".to_string(),
             theme: "system".to_string(),
+            language: "system".to_string(),
             bootstrapper_title: crate::app::PROJECT_NAME.to_string(),
             debug_disable_version_package_cleanup: false,
             custom_integrations: Vec::new(),

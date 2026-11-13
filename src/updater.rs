@@ -17,6 +17,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::app::{self, PROJECT_NAME, PROJECT_REPOSITORY, VERSION};
+use crate::lang::pick;
 use crate::paths;
 
 const IDENT: &str = "Updater";
@@ -120,16 +121,19 @@ pub fn check() -> Result<Option<UpdateInfo>, String> {
         .header("Accept", "application/vnd.github+json")
         .timeout(Duration::from_secs(15))
         .send()
-        .map_err(|e| format!("Could not reach GitHub: {e}"))?;
+        .map_err(|e| pick(&format!("Could not reach GitHub: {e}"), &format!("Gagal nyambung ke GitHub: {e}")))?;
     let status = resp.status();
     if status.as_u16() == 404 {
         with(|s| s.latest = None);
         return Ok(None);
     }
     if !status.is_success() {
-        return Err(format!("GitHub answered with HTTP {}", status.as_u16()));
+        return Err(pick(
+            &format!("GitHub answered with HTTP {}", status.as_u16()),
+            &format!("GitHub membalas dengan HTTP {}", status.as_u16()),
+        ));
     }
-    let rel: Release = resp.json().map_err(|e| format!("Unreadable answer from GitHub: {e}"))?;
+    let rel: Release = resp.json().map_err(|e| pick(&format!("Unreadable answer from GitHub: {e}"), &format!("Balasan GitHub nggak bisa dibaca: {e}")))?;
     let remote = rel.tag_name.trim().trim_start_matches(['v', 'V']).to_string();
     crate::log!(IDENT, "Latest release {remote}, running {VERSION}");
     if !is_newer(&remote, VERSION) {
@@ -142,10 +146,15 @@ pub fn check() -> Result<Option<UpdateInfo>, String> {
         .iter()
         .find(|a| a.name.eq_ignore_ascii_case(ASSET_NAME))
         .or_else(|| rel.assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe")))
-        .ok_or_else(|| format!("Release {remote} has no {ASSET_NAME} file"))?;
+        .ok_or_else(|| {
+            pick(&format!("Release {remote} has no {ASSET_NAME} file"), &format!("Rilis {remote} nggak punya file {ASSET_NAME}"))
+        })?;
     let prefix = format!("https://github.com/{PROJECT_REPOSITORY}/releases/download/").to_lowercase();
     if !asset.browser_download_url.to_lowercase().starts_with(&prefix) {
-        return Err("The release points to an unexpected download address".into());
+        return Err(pick(
+            "The release points to an unexpected download address",
+            "Rilis ini nunjuk ke alamat unduhan yang nggak dikenal",
+        ));
     }
     let sha256 = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")).map(|d| d.trim().to_lowercase());
     let info = UpdateInfo { version: remote, url: asset.browser_download_url.clone(), size: asset.size, sha256 };
@@ -159,9 +168,9 @@ pub fn check() -> Result<Option<UpdateInfo>, String> {
 pub fn start(on_done: impl FnOnce(bool) + Send + 'static) -> Result<(), String> {
     let info = with(|s| -> Result<UpdateInfo, String> {
         if matches!(s.progress.phase, Phase::Downloading | Phase::Installing) {
-            return Err("An update is already running".to_string());
+            return Err(pick("An update is already running", "Update lagi jalan"));
         }
-        let info = s.latest.clone().ok_or_else(|| "No update is waiting".to_string())?;
+        let info = s.latest.clone().ok_or_else(|| pick("No update is waiting", "Nggak ada update yang nunggu"))?;
         s.progress = Progress { phase: Phase::Downloading, done: 0, total: info.size, error: None };
         Ok(info)
     })?;
@@ -188,7 +197,10 @@ pub fn start(on_done: impl FnOnce(bool) + Send + 'static) -> Result<(), String> 
 fn run(info: &UpdateInfo) -> Result<(), String> {
     let exe = paths::get().application.clone();
     if !exe.is_file() || !paths::running_installed_copy() {
-        return Err(format!("Open the installed copy of {PROJECT_NAME} to update it"));
+        return Err(pick(
+            &format!("Open the installed copy of {PROJECT_NAME} to update it"),
+            &format!("Buka dulu {PROJECT_NAME} yang sudah terpasang buat update"),
+        ));
     }
     let new = exe.with_extension("exe.new");
     let old = exe.with_extension("exe.old");
@@ -208,24 +220,31 @@ fn download(info: &UpdateInfo, dest: &Path) -> Result<(), String> {
         .get(&info.url)
         .timeout(Duration::from_secs(900))
         .send()
-        .map_err(|e| format!("Download failed: {e}"))?;
+        .map_err(|e| pick(&format!("Download failed: {e}"), &format!("Unduhan gagal: {e}")))?;
     if !resp.status().is_success() {
-        return Err(format!("Download failed: HTTP {}", resp.status().as_u16()));
+        return Err(pick(
+            &format!("Download failed: HTTP {}", resp.status().as_u16()),
+            &format!("Unduhan gagal: HTTP {}", resp.status().as_u16()),
+        ));
     }
     let total = resp.content_length().unwrap_or(info.size);
     with(|s| s.progress.total = total);
 
-    let mut file = File::create(dest).map_err(|e| format!("Cannot write {}: {e}", dest.display()))?;
+    let mut file = File::create(dest).map_err(|e| {
+        pick(&format!("Cannot write {}: {e}", dest.display()), &format!("Gagal nulis {}: {e}", dest.display()))
+    })?;
     let mut hasher = Sha256::new();
     let mut buf = vec![0u8; 64 * 1024];
     let mut done: u64 = 0;
     loop {
-        let n = resp.read(&mut buf).map_err(|e| format!("Download interrupted: {e}"))?;
+        let n = resp.read(&mut buf).map_err(|e| pick(&format!("Download interrupted: {e}"), &format!("Unduhan terputus: {e}")))?;
         if n == 0 {
             break;
         }
         hasher.update(&buf[..n]);
-        file.write_all(&buf[..n]).map_err(|e| format!("Cannot write {}: {e}", dest.display()))?;
+        file.write_all(&buf[..n]).map_err(|e| {
+            pick(&format!("Cannot write {}: {e}", dest.display()), &format!("Gagal nulis {}: {e}", dest.display()))
+        })?;
         done += n as u64;
         with(|s| s.progress.done = done);
     }
@@ -233,20 +252,29 @@ fn download(info: &UpdateInfo, dest: &Path) -> Result<(), String> {
     drop(file);
 
     if info.size > 0 && done != info.size {
-        return Err(format!("Downloaded {done} bytes but the release lists {}", info.size));
+        return Err(pick(
+            &format!("Downloaded {done} bytes but the release lists {}", info.size),
+            &format!("Ukuran unduhan {done} byte, beda dari yang tercatat di rilis ({})", info.size),
+        ));
     }
     if done < 100_000 {
-        return Err("The downloaded file is too small to be Ruststrap".into());
+        return Err(pick(
+            "The downloaded file is too small to be Ruststrap",
+            "File yang diunduh terlalu kecil buat jadi Ruststrap",
+        ));
     }
     let mut head = [0u8; 2];
     File::open(dest).and_then(|mut f| f.read_exact(&mut head)).map_err(|e| e.to_string())?;
     if &head != b"MZ" {
-        return Err("The downloaded file is not a Windows program".into());
+        return Err(pick("The downloaded file is not a Windows program", "File yang diunduh bukan program Windows"));
     }
     if let Some(want) = &info.sha256 {
         let got = format!("{:x}", hasher.finalize());
         if !got.eq_ignore_ascii_case(want) {
-            return Err("The downloaded file does not match the checksum of the release".into());
+            return Err(pick(
+                "The downloaded file does not match the checksum of the release",
+                "File yang diunduh nggak cocok sama checksum rilisnya",
+            ));
         }
     }
     Ok(())
@@ -255,10 +283,18 @@ fn download(info: &UpdateInfo, dest: &Path) -> Result<(), String> {
 /// A running exe can be renamed but not overwritten: move it aside, then put the new one in its place.
 fn swap(exe: &Path, new: &Path, old: &Path) -> Result<(), String> {
     let _ = fs::remove_file(old);
-    fs::rename(exe, old).map_err(|e| format!("Cannot move the current {PROJECT_NAME}.exe aside: {e}"))?;
+    fs::rename(exe, old).map_err(|e| {
+        pick(
+            &format!("Cannot move the current {PROJECT_NAME}.exe aside: {e}"),
+            &format!("Gagal menyingkirkan {PROJECT_NAME}.exe yang lama: {e}"),
+        )
+    })?;
     if let Err(e) = fs::rename(new, exe) {
         let _ = fs::rename(old, exe);
-        return Err(format!("Cannot put the new version in place: {e}"));
+        return Err(pick(
+            &format!("Cannot put the new version in place: {e}"),
+            &format!("Gagal memasang versi baru: {e}"),
+        ));
     }
     crate::log!(IDENT, "Swapped in the new executable");
     Ok(())
@@ -286,19 +322,31 @@ pub fn cli() -> i32 {
             1
         }
         Ok(None) => {
-            println!("{PROJECT_NAME} {VERSION} is the latest version.");
+            println!(
+                "{}",
+                pick(
+                    &format!("{PROJECT_NAME} {VERSION} is the latest version."),
+                    &format!("{PROJECT_NAME} {VERSION} sudah versi terbaru.")
+                )
+            );
             0
         }
         Ok(Some(info)) => {
-            println!("New version {} found (you have {VERSION}). Downloading...", info.version);
+            println!(
+                "{}",
+                pick(
+                    &format!("New version {} found (you have {VERSION}). Downloading...", info.version),
+                    &format!("Ada versi baru {} (kamu pakai {VERSION}). Lagi mengunduh...", info.version)
+                )
+            );
             with(|s| s.progress = Progress { phase: Phase::Downloading, done: 0, total: info.size, error: None });
             match run(&info) {
                 Ok(()) => {
-                    println!("Updated to {}.", info.version);
+                    println!("{}", pick(&format!("Updated to {}.", info.version), &format!("Berhasil update ke {}.", info.version)));
                     0
                 }
                 Err(e) => {
-                    eprintln!("Update failed: {e}");
+                    eprintln!("{}", pick(&format!("Update failed: {e}"), &format!("Update gagal: {e}")));
                     1
                 }
             }

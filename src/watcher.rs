@@ -55,9 +55,9 @@ pub fn run() -> i32 {
         }
     };
 
-    let (tracking, close_on_leave) = {
+    let (tracking, close_on_leave, use_rpc) = {
         let s = app::settings();
-        (s.prop.enable_activity_tracking, s.prop.use_disable_app_patch)
+        (s.prop.enable_activity_tracking, s.prop.use_disable_app_patch, s.prop.use_discord_rich_presence)
     };
 
     let disposed = Arc::new(AtomicBool::new(false));
@@ -68,15 +68,29 @@ pub fn run() -> i32 {
             let pid = data.process_id;
             handle = Some(thread::spawn(move || {
                 let mut w = ActivityWatcher::new();
+                let mut rpc = if use_rpc { Some(crate::discord::DiscordRpc::new()) } else { None };
                 w.run(std::path::Path::new(&log_file), d, |ev| match ev {
                     ActivityEvent::AppClose => {
                         if close_on_leave {
                             close_process(pid, false);
                         }
                     }
-                    ActivityEvent::GameJoin(a) => crate::log!(IDENT, "Joined place {} (job {})", a.place_id, a.job_id),
-                    ActivityEvent::GameLeave(a) => crate::log!(IDENT, "Left place {}", a.place_id),
+                    ActivityEvent::GameJoin(a) => {
+                        crate::log!(IDENT, "Joined place {} (job {})", a.place_id, a.job_id);
+                        if let Some(r) = rpc.as_mut() {
+                            r.on_join(&a);
+                        }
+                    }
+                    ActivityEvent::GameLeave(a) => {
+                        crate::log!(IDENT, "Left place {}", a.place_id);
+                        if let Some(r) = rpc.as_mut() {
+                            r.on_leave();
+                        }
+                    }
                 });
+                if let Some(r) = rpc.as_mut() {
+                    r.shutdown();
+                }
             }));
         }
     }

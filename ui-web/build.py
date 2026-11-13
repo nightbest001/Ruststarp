@@ -5,11 +5,12 @@ here=os.path.dirname(os.path.abspath(__file__))
 def r(p,mode='r'):return open(os.path.join(here,p),mode,encoding=None if 'b' in mode else 'utf-8').read()
 icon=base64.b64encode(r('../assets/Ruststrap-256.png','rb')).decode()
 strings=r('strings.json')
+strings_id=r('strings.id.json')
 html=f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ruststrap</title><style>{r('style.css')}</style></head>
 <body><div id="root"></div>
-<script>window.APP_ICON="data:image/png;base64,{icon}";window.STRINGS={strings};</script>
+<script>window.APP_ICON="data:image/png;base64,{icon}";window.STRINGS={strings};window.STRINGS_ID={strings_id};</script>
 <script>{r('icons.js')}</script>
 <script>{r('core.js')}</script>
 <script>if(!window.__INIT)window.__INIT=window.__DEV_INIT||null;</script>

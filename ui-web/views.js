@@ -1,6 +1,7 @@
 /* views: settings, home, launch (bootstrapper), setup (installer), about */
 (function(){
 const D=window.__INIT;const NAME=D.name;const WIKI=D.links.wiki;
+setLang(effLang(D.settings.language,D.system_lang));
 const root=document.getElementById('root');
 const F={MSAA:'FIntDebugForceMSAASamples',TEXON:'DFFlagTextureQualityOverrideEnabled',TEXLV:'DFIntTextureQualityOverride',SCALE:'DFFlagDisableDPIScale',FS:'FFlagHandleAltEnterFullscreenManually'};
 const PRESET_FLAGS=Object.values(F);
@@ -15,19 +16,19 @@ function UpdateBar(o){
   const title=h('div',{class:'tt'});const sub=h('div',{class:'ds'});
   const pbv=h('div',{class:'v'});const pb=h('div',{class:'pb',style:{display:'none',marginTop:'8px'}},pbv);
   const go=Btn('',{kind:'primary',icon:'ArrowDownload16',onclick:()=>run()});
-  const later=Btn('Later',{onclick:()=>hide()});
+  const later=Btn(t('X.Upd.Later'),{onclick:()=>hide()});
   const label=txt=>{go.querySelector('span').textContent=txt};
   const show=()=>{el.style.display='';if(D.mode==='home')call('win',{op:'banner',on:true})};
   function hide(){el.style.display='none';if(D.mode==='home')call('win',{op:'banner',on:false})}
   function fail(e){S.busy=false;go.disabled=false;go.classList.remove('dis');later.style.display='';
     pb.classList.remove('ind');pb.classList.add('err');pbv.style.width='100%';
-    title.textContent='Update failed';sub.textContent=String(e||'Unknown error');label('Try again')}
+    title.textContent=t('X.Upd.Failed');sub.textContent=String(e||t('X.Upd.Unknown'));label(t('X.Upd.Retry'))}
   async function run(){
     if(S.busy)return;
     if(o.beforeRun&&!(await o.beforeRun()))return;
     S.busy=true;go.disabled=true;go.classList.add('dis');later.style.display='none';
     pb.style.display='';pb.classList.remove('err');pb.classList.add('ind');
-    title.textContent='Updating '+NAME;sub.textContent='Starting...';
+    title.textContent=t('X.Upd.Updating',NAME);sub.textContent=t('X.Upd.Starting');
     try{await call('start_update')}catch(e){return fail(e)}
     poll()}
   async function poll(){
@@ -36,29 +37,31 @@ function UpdateBar(o){
     if(p.phase==='failed')return fail(p.error);
     if(p.phase==='downloading'){
       if(p.total){pb.classList.remove('ind');pbv.style.width=Math.min(100,p.done*100/p.total)+'%'}
-      sub.textContent='Downloading '+mb(p.done)+(p.total?' of '+mb(p.total):'')}
-    else{pb.classList.add('ind');sub.textContent=p.phase==='done'?'Restarting...':'Installing...'}
+      sub.textContent=p.total?t('X.Upd.DownloadingOf',mb(p.done),mb(p.total)):t('X.Upd.Downloading',mb(p.done))}
+    else{pb.classList.add('ind');sub.textContent=p.phase==='done'?t('X.Upd.Restarting'):t('X.Upd.Installing')}
     setTimeout(poll,150)}
   /* manual=true: tell the user when there is nothing new or the check failed */
   el.check=async function(manual){
     try{
       const r=await call('check_update');
       if(r&&r.available){
-        title.textContent='Update available: version '+r.version;
-        sub.textContent='You have '+r.current+(r.size?' ('+mb(r.size)+')':'')+'. The update installs right here, no browser download needed.';
-        label('Update to '+r.version);show();return true}
-      if(manual)snack({title:'You are up to date',msg:NAME+' '+D.version+' is the newest version.',kind:'ok',icon:'CheckmarkCircle32'});
-    }catch(e){if(manual)snack({title:'Could not check for updates',msg:String(e),kind:'bad',timeout:6000})}
+        title.textContent=t('X.Upd.Available',r.version);
+        sub.textContent=t('X.Upd.Sub',r.current,r.size?' ('+mb(r.size)+')':'');
+        label(t('X.Upd.To',r.version));show();return true}
+      if(manual)snack({title:t('X.Upd.UpToDate'),msg:t('X.Upd.UpToDate.Msg',NAME,D.version),kind:'ok',icon:'CheckmarkCircle32'});
+    }catch(e){if(manual)snack({title:t('X.Upd.CheckFailed'),msg:String(e),kind:'bad',timeout:6000})}
     return false};
   el.append(icon('ArrowDownload16','ui'),h('div',{class:'ut'},title,sub,pb),go,later);
   return el}
 
 /* =========================================================== SETTINGS */
-function Settings(){
-  const S={s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null};
-  const snap=()=>JSON.stringify([S.s,S.force,S.flags,S.sc]);let saved=snap();
+function Settings(prev){
+  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null};
+  const snap=()=>JSON.stringify([S.s,S.force,S.flags,S.sc]);let saved=prev?prev.saved:snap();
   const dirty=()=>snap()!==saved;
-  let page='integrations';let crumbs=[];
+  let page=prev?prev.page:'integrations';let crumbs=[];
+  /* language changed: build the whole window again in the new language, keeping every unsaved edit */
+  const reopen=()=>{root.innerHTML='';Settings({S,saved,page})};
   const win=h('div',{class:'win'});
   window.__themeMode=S.s.theme;applyTheme(S.s.theme);
   const upd=UpdateBar({beforeRun:async()=>!dirty()||await confirmBox(t('Common.Warning'),t('Menu.UnsavedChanges'))});
@@ -92,7 +95,7 @@ function Settings(){
       saved=snap();touch();
       if(r&&r.failed&&r.failed.length)snack({title:t('Menu.Save'),msg:r.failed.join('\n'),kind:'bad',icon:'Info20',timeout:6000});
       else snack({title:t('Menu.SettingsSaved.Title'),msg:t('Menu.SettingsSaved.Message'),kind:'ok',icon:'CheckmarkCircle32'})}
-    catch(e){snack({title:'Error',msg:String(e),kind:'bad',timeout:6000})}}
+    catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
   async function closeWin(){
     if(dirty()){const ok=await confirmBox(t('Common.Warning'),t('Menu.UnsavedChanges'));if(!ok)return}
     call('win',{op:'close',force:true})}
@@ -125,6 +128,10 @@ function Settings(){
       const el=pg(dsc('Menu.Integrations.Description'),sec('Menu.Integrations.ActivityTracking'),
         Option({header:t('Menu.Integrations.EnableActivityTracking.Title'),desc:t('Menu.Integrations.EnableActivityTracking.Description'),help:WIKI+'/features/activity-tracking/',content:Toggle(()=>S.s.enable_activity_tracking,v=>S.s.enable_activity_tracking=v)}),
         Option({header:t('Menu.Integrations.DesktopApp.Title'),desc:t('Menu.Integrations.DesktopApp.Description',WIKI+'/features/dont-exit-to-desktop-app/'),help:WIKI+'/features/dont-exit-to-desktop-app/',enabled:act,content:Toggle(()=>S.s.use_disable_app_patch,v=>S.s.use_disable_app_patch=v)}),
+        sec('X.Rpc.Title'),h('div',{class:'desc',style:{margin:0}},md('X.Rpc.Description',WIKI+'/features/discord-rich-presence/')),
+        Option({header:t('X.Rpc.Show.Title'),desc:t('X.Rpc.Show.Description'),enabled:act,content:Toggle(()=>S.s.use_discord_rich_presence,v=>S.s.use_discord_rich_presence=v)}),
+        Option({header:t('X.Rpc.Join.Title'),desc:t('X.Rpc.Join.Description'),enabled:()=>act()&&S.s.use_discord_rich_presence,content:Toggle(()=>S.s.allow_activity_joining,v=>S.s.allow_activity_joining=v)}),
+        Option({header:t('X.Rpc.Account.Title'),desc:t('X.Rpc.Account.Description'),enabled:()=>act()&&S.s.use_discord_rich_presence,content:Toggle(()=>S.s.show_account_on_rich_presence,v=>S.s.show_account_on_rich_presence=v)}),
         sec('Menu.Integrations.Custom.Title'),h('div',{class:'desc',style:{margin:0}},t('Menu.Integrations.Custom.Description')),
         h('div',{class:'cint'},h('div',{class:'lcol'},list,h('div',{class:'btnrow',style:{margin:0}},
           Btn(t('Common.New'),{icon:'Add28',onclick:()=>{S.s.custom_integrations.push({name:t('Menu.Integrations.Custom.NewIntegration'),location:'',launch_args:'',auto_close:true});S.sel=S.s.custom_integrations.length-1;paint();touch()}}),
@@ -134,19 +141,19 @@ function Settings(){
     behaviour(){return pg(dsc('Menu.Behaviour.Description'),
       Option({header:t('Menu.Behaviour.ConfirmLaunches.Title'),desc:t('Menu.Behaviour.ConfirmLaunches.Description'),content:Toggle(()=>S.s.confirm_launches,v=>S.s.confirm_launches=v)}),
       Option({header:t('Menu.Behaviour.ForceRobloxReinstall.Title'),desc:t('Menu.Behaviour.ForceRobloxReinstall.Description'),enabled:()=>D.installed,content:Toggle(()=>S.force,v=>S.force=v)}),
-      Option({header:'Keep downloaded packages',desc:'Keeps old package files in the cache instead of deleting them after an update.',content:Toggle(()=>S.s.debug_disable_version_package_cleanup,v=>S.s.debug_disable_version_package_cleanup=v)}))},
+      Option({header:t('X.Behaviour.KeepPackages.Title'),desc:t('X.Behaviour.KeepPackages.Description'),content:Toggle(()=>S.s.debug_disable_version_package_cleanup,v=>S.s.debug_disable_version_package_cleanup=v)}))},
 
     mods(){return pg(dsc('Menu.Mods.Description'),
       h('div',{class:'grid2'},
         CardAction({icon:'Folder24',title:t('Menu.Mods.OpenModsFolder.Title'),desc:t('Menu.Mods.OpenModsFolder.Description'),onclick:()=>call('open_folder',{which:'mods'})}),
         CardAction({icon:'BookQuestionMark24',title:t('Common.Help'),desc:t('Menu.Mods.Help.Description'),onclick:()=>openUrl(WIKI+'/features/mods/')})),
-      Card(h('div',{style:{fontSize:'14px'}},'How it works'),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px',lineHeight:1.4}},
-        'Every file you put in the mods folder replaces the file with the same path inside the Roblox folder. For example, content\\sounds\\ouch.ogg changes the death sound. Delete the file and the original comes back the next time Roblox starts through '+NAME+'.')))},
+      Card(h('div',{style:{fontSize:'14px'}},t('X.Mods.How.Title')),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px',lineHeight:1.4}},
+        t('X.Mods.How.Text',NAME))))},
 
     fastflags(){
       const msaa=Combo([{v:'',label:t('Common.Automatic')},{v:'1',label:'1x'},{v:'2',label:'2x'},{v:'4',label:'4x'}],()=>flag(F.MSAA)||'',v=>setFlag(F.MSAA,v||null));
       const texOn=()=>flag(F.TEXON)!=null;
-      const tex=Combo([{v:'',label:t('Common.Automatic')},{v:'0',label:'Level 0'},{v:'1',label:'Level 1'},{v:'2',label:'Level 2'},{v:'3',label:'Level 3'}],()=>texOn()?(flag(F.TEXLV)||''):'',v=>{if(!v){setFlag(F.TEXON,null);setFlag(F.TEXLV,null)}else{setFlag(F.TEXON,'True');setFlag(F.TEXLV,v)}});
+      const tex=Combo([{v:'',label:t('Common.Automatic')},{v:'0',label:t('X.Level',0)},{v:'1',label:t('X.Level',1)},{v:'2',label:t('X.Level',2)},{v:'3',label:t('X.Level',3)}],()=>texOn()?(flag(F.TEXLV)||''):'',v=>{if(!v){setFlag(F.TEXON,null);setFlag(F.TEXLV,null)}else{setFlag(F.TEXON,'True');setFlag(F.TEXLV,v)}});
       return pg(h('div',{class:'desc',style:{marginBottom:'16px'}},t('Menu.FastFlags.Description')),
         Option({header:t('Menu.FastFlags.ManagerEnabled.Title'),desc:t('Menu.FastFlags.ManagerEnabled.Description'),content:Toggle(()=>S.s.use_fast_flag_manager,v=>S.s.use_fast_flag_manager=v)}),
         sec('Common.Presets'),h('div',{class:'h3'},t('Menu.FastFlags.Presets.Categories.Rendering')),
@@ -185,7 +192,8 @@ function Settings(){
     appearance(){
       const dim=h('div');
       return pg(dsc('Menu.Appearance.Description'),
-        Option({header:t('Menu.Appearance.Global.Theme.Title'),content:Combo([{v:'system',label:t('Common.SystemDefault')},{v:'light',label:'Light'},{v:'dark',label:'Dark'}],()=>S.s.theme,v=>S.s.theme=v)}),
+        Option({header:t('Menu.Appearance.Global.Theme.Title'),content:Combo([{v:'system',label:t('Common.SystemDefault')},{v:'light',label:t('Enums.Theme.Light')},{v:'dark',label:t('Enums.Theme.Dark')}],()=>S.s.theme,v=>S.s.theme=v)}),
+        Option({header:t('Menu.Appearance.Language.Title'),desc:t('Menu.Appearance.Language.Description'),content:Combo([{v:'system',label:t('Common.SystemDefault')},{v:'en',label:'English'},{v:'id',label:'Bahasa Indonesia'}],()=>S.s.language,v=>{S.s.language=v;setLang(effLang(v,D.system_lang));setTimeout(reopen,0)},200)}),
         sec('Menu.Appearance.Bootstrapper.Title'),h('div',{class:'desc',style:{margin:0}},t('Menu.Appearance.Bootstrapper.Description')),
         h('div',{style:{marginTop:'16px'}},Btn(t('Menu.Appearance.Preview'),{onclick:()=>previewBoot(S.s.bootstrapper_title)})),
         Expander({title:t('Menu.Appearance.Customisation.Title'),desc:t('Menu.Appearance.Customisation.Description'),body:h('div',null,
@@ -201,32 +209,32 @@ function Settings(){
         h('div',{class:'grid3'},opt(t('LaunchMenu.LaunchRoblox'),2),opt(t('LaunchMenu.LaunchRobloxStudio'),3),opt(t('Menu.Title'),4))) },
 
     gpu(){
-      const kind=a=>({discrete:'discrete',integrated:'integrated'}[a.kind]||'unknown type');
-      const cur=Combo([{v:'default',label:'Let Windows decide'},{v:'saving',label:'Power saving GPU'},{v:'high',label:'High performance GPU'}],()=>S.s.gpu_preference,v=>S.s.gpu_preference=v,220);
+      const kind=a=>({discrete:t('X.Gpu.Discrete'),integrated:t('X.Gpu.Integrated')}[a.kind]||t('X.Gpu.Unknown'));
+      const cur=Combo([{v:'default',label:t('X.Gpu.Default')},{v:'saving',label:t('X.Gpu.Saving')},{v:'high',label:t('X.Gpu.High')}],()=>S.s.gpu_preference,v=>S.s.gpu_preference=v,220);
       const hint=h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}});
-      reg(()=>hint.textContent=({default:'No change. Windows picks the GPU.',saving:'Usually the integrated GPU. Longer battery life.',high:'Usually the discrete GPU (NVIDIA / AMD). Best for playing.'})[S.s.gpu_preference]||'');
-      return pg(h('div',{class:'desc'},'Pick which graphics card Roblox uses. Useful on laptops with two GPUs.'),sec('Detected'),
-        D.adapters.length?D.adapters.map(a=>Card(h('div',null,a.name),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px'}},`${a.vendor}  ·  ${kind(a)}  ·  ${a.vram_mb?a.vram_mb+' MB':'VRAM unknown'}`))):Card(h('span',{class:'t2'},'No GPU was found in the registry.')),
-        sec('Roblox should use'),Option({header:'Graphics card',desc:'Pick the GPU Roblox runs on.',content:cur}),hint,
-        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},'Windows keeps this per Roblox version. '+NAME+' writes it again after every update.'))},
+      reg(()=>hint.textContent=({default:t('X.Gpu.Hint.Default'),saving:t('X.Gpu.Hint.Saving'),high:t('X.Gpu.Hint.High')})[S.s.gpu_preference]||'');
+      return pg(h('div',{class:'desc'},t('X.Gpu.Description')),sec('X.Gpu.Detected'),
+        D.adapters.length?D.adapters.map(a=>Card(h('div',null,a.name),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px'}},`${a.vendor}  ·  ${kind(a)}  ·  ${a.vram_mb?a.vram_mb+' MB':t('X.Gpu.VramUnknown')}`))):Card(h('span',{class:'t2'},t('X.Gpu.None'))),
+        sec('X.Gpu.Use'),Option({header:t('X.Gpu.Card'),desc:t('X.Gpu.CardDesc'),content:cur}),hint,
+        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},t('X.Gpu.Note',NAME)))},
 
     ruststrap(){
       const ec={v:true},el={v:true};
       return pg(h('div',{class:'desc'},t('Menu.Bloxstrap.Description')),
-        Option({header:D.installed?'Repair installation':'Install '+NAME,desc:'Copies '+NAME+' to your user folder and makes roblox:// links open through it.',content:Btn(D.installed?'Repair':t('Common.Navigation.Install'),{kind:'primary',onclick:async()=>{try{await call('install');D.installed=true;snack({title:NAME+' installed',kind:'ok',icon:'CheckmarkCircle32'});go('ruststrap')}catch(e){snack({title:'Install failed',msg:String(e),kind:'bad',timeout:6000})}}})}),
+        Option({header:D.installed?t('X.Rs.Repair.Title'):t('X.Rs.Install.Title',NAME),desc:t('X.Rs.Install.Desc',NAME),content:Btn(D.installed?t('X.Rs.Repair'):t('Common.Navigation.Install'),{kind:'primary',onclick:async()=>{try{await call('install');D.installed=true;snack({title:t('X.Rs.Installed',NAME),kind:'ok',icon:'CheckmarkCircle32'});go('ruststrap')}catch(e){snack({title:t('X.Rs.InstallFailed'),msg:String(e),kind:'bad',timeout:6000})}}})}),
         Option({header:t('Menu.Behaviour.AutoUpdate.Title'),desc:t('Menu.Behaviour.AutoUpdate.Description'),content:Toggle(()=>S.s.check_for_updates,v=>S.s.check_for_updates=v)}),
-        Option({header:'Check for updates now',desc:'You have version '+D.version+'. Looks on GitHub for a newer release.'+(D.can_update?'':' Open the installed copy of '+NAME+' to update it.'),content:Btn('Check now',{icon:'ArrowDownload16',enabled:()=>D.can_update,onclick:()=>upd.check(true)})}),
-        Option({header:'Data folder',desc:D.paths.base,content:Btn('Open',{icon:'Folder24',onclick:()=>call('open_folder',{which:'base'})})}),
-        Option({header:'Logs',desc:D.paths.logs,content:Btn(t('Common.OpenLogFile').replace(/ file$/,''),{icon:'Folder24',onclick:()=>call('open_folder',{which:'logs'})})}),
+        Option({header:t('X.Rs.CheckNow.Title'),desc:t('X.Rs.CheckNow.Desc',D.version)+(D.can_update?'':t('X.Rs.CheckNow.NeedInstalled',NAME)),content:Btn(t('X.Rs.CheckNow.Btn'),{icon:'ArrowDownload16',enabled:()=>D.can_update,onclick:()=>upd.check(true)})}),
+        Option({header:t('X.Rs.DataFolder'),desc:D.paths.base,content:Btn(t('X.Open'),{icon:'Folder24',onclick:()=>call('open_folder',{which:'base'})})}),
+        Option({header:t('X.Rs.Logs'),desc:D.paths.logs,content:Btn(t('X.Open'),{icon:'Folder24',onclick:()=>call('open_folder',{which:'logs'})})}),
         Card(h('div',{style:{display:'flex',alignItems:'center',gap:'16px'}},h('div',{style:{flex:1}},h('div',null,t('Menu.Bloxstrap.ExportData.Title')),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px'}},t('Menu.Bloxstrap.ExportData.Description')),
           h('div',{style:{display:'flex',gap:'24px',marginTop:'12px'}},Check(t('Menu.Bloxstrap.ExportData.ExportConfig'),()=>ec.v,v=>ec.v=v),Check(t('Menu.Bloxstrap.ExportData.ExportLogs'),()=>el.v,v=>el.v=v))),
-          Btn(t('Common.Export'),{icon:'CopySelect20',cls:'',enabled:()=>ec.v||el.v,onclick:async()=>{try{const r=await call('export_diag',{config:ec.v,logs:el.v});if(r)snack({title:'Diagnostic data exported',kind:'ok',icon:'CheckmarkCircle32'})}catch(e){snack({title:'Export failed',msg:String(e),kind:'bad',timeout:6000})}}}))),
-        Option({header:'Uninstall',desc:'Removes '+NAME+', its shortcuts and the Roblox it installed. You can also do this from Windows Settings > Apps.',content:Btn('Uninstall',{kind:'danger',icon:'Delete28',enabled:()=>D.installed,onclick:async()=>{
+          Btn(t('Common.Export'),{icon:'CopySelect20',cls:'',enabled:()=>ec.v||el.v,onclick:async()=>{try{const r=await call('export_diag',{config:ec.v,logs:el.v});if(r)snack({title:t('X.Rs.Exported'),kind:'ok',icon:'CheckmarkCircle32'})}catch(e){snack({title:t('X.Rs.ExportFailed'),msg:String(e),kind:'bad',timeout:6000})}}}))),
+        Option({header:t('Uninstaller.Uninstall'),desc:t('X.Rs.Uninstall.Desc',NAME),content:Btn(t('Uninstaller.Uninstall'),{kind:'danger',icon:'Delete28',enabled:()=>D.installed,onclick:async()=>{
           const keep={v:false};
-          const body=h('div',null,h('div',null,NAME+' and the Roblox it installed will be removed.'),h('div',{style:{marginTop:'12px'}},Check(t('Uninstaller.KeepData.Label'),()=>keep.v,v=>keep.v=v)),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'4px'}},t('Uninstaller.KeepData.Description')));
-          if(await confirmBox('Uninstall '+NAME+'?',body,t('Uninstaller.Uninstall'),t('Common.Cancel'))){
-            try{await call('uninstall',{keep_data:keep.v});await dialog({title:'Uninstalled',body:NAME+' has been removed.'});call('win',{op:'close',force:true})}
-            catch(e){snack({title:'Uninstall failed',msg:String(e),kind:'bad',timeout:6000})}}}})}))},
+          const body=h('div',null,h('div',null,t('X.Rs.Uninstall.Confirm',NAME)),h('div',{style:{marginTop:'12px'}},Check(t('Uninstaller.KeepData.Label'),()=>keep.v,v=>keep.v=v)),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'4px'}},t('Uninstaller.KeepData.Description')));
+          if(await confirmBox(t('X.Rs.Uninstall.ConfirmTitle',NAME),body,t('Uninstaller.Uninstall'),t('Common.Cancel'))){
+            try{await call('uninstall',{keep_data:keep.v});await dialog({title:t('X.Rs.Uninstalled.Title'),body:t('X.Rs.Uninstalled.Text',NAME)});call('win',{op:'close',force:true})}
+            catch(e){snack({title:t('X.Rs.Uninstall.Failed'),msg:String(e),kind:'bad',timeout:6000})}}}})}))},
 
     about(){return AboutBody()}
   };
@@ -255,8 +263,8 @@ function Settings(){
   const rootEl=h('div',{class:'root'},navEl,mainEl);
   wrap(win,TitleBar({title:t('Menu.Title'),min:true,max:true,onclose:()=>closeWin()}),upd,rootEl,status,ResizeHandles());
   const dirtyLabel=status.querySelector('.l');
-  onTouch(()=>{const d=dirty();saveBtn.disabled=false;dirtyLabel.textContent=D.installed?'':'Not installed yet: open the '+NAME+' page and press Install.'});
-  root.append(win);go('integrations');
+  onTouch(()=>{const d=dirty();saveBtn.disabled=false;dirtyLabel.textContent=D.installed?'':t('X.NotInstalled',NAME)});
+  root.append(win);go(page);
   if(D.can_update&&D.settings.check_for_updates)upd.check(false);
   if(D.already_running)snack({title:t('Menu.AlreadyRunning.Title'),msg:t('Menu.AlreadyRunning.Caption'),icon:'Info20',timeout:10000});
 }
@@ -270,8 +278,8 @@ function AboutBody(){
     h('div',{class:'h2'},t('Menu.About.HelpInformation')),
     h('div',{class:'grid2'},link('Code24',t('Menu.About.GithubRepository'),D.links.repo),link('BookQuestionMark24',t('Menu.About.ReportIssue'),D.links.issues)),
     Expander({icon:'Heart24',title:t('Menu.About.Licenses'),open:false,body:h('div',null,
-      h('div',null,NAME+' is a Rust port of Bloxstrap.'),h('div',{class:'t3',style:{marginTop:'6px',fontSize:'12px',lineHeight:1.45}},'The launch, update and mod pipeline comes from Bloxstrap by pizzaboxer and contributors, used under the MIT license.'),
-      h('div',{style:{marginTop:'8px'}},h('a',{class:'lnk',onclick:()=>openUrl('https://github.com/bloxstraplabs/bloxstrap')},'Bloxstrap on GitHub')))}))}
+      h('div',null,t('X.About.Rust',NAME)),h('div',{class:'t3',style:{marginTop:'6px',fontSize:'12px',lineHeight:1.45}},t('X.About.License')),
+      h('div',{style:{marginTop:'8px'}},h('a',{class:'lnk',onclick:()=>openUrl('https://github.com/bloxstraplabs/bloxstrap')},t('X.About.BloxLink'))))}))}
 
 /* =========================================================== BOOT DIALOG (Fluent) */
 function BootView(o){
@@ -286,7 +294,7 @@ function previewBoot(title){
   const el=BootView({message:t('Bootstrapper.Status.Connecting'),oncancel:()=>{clearInterval(iv);scrim.remove()}});
   const win=h('div',{class:'win framed',style:{width:'500px',height:'280px',borderRadius:'8px',overflow:'hidden',boxShadow:'0 32px 64px rgba(0,0,0,.37)',animation:'dlgIn .25s cubic-bezier(.1,.9,.2,1)'}},el);
   const scrim=h('div',{class:'scrim'},win);document.body.append(scrim);
-  const steps=[[t('Bootstrapper.Status.Connecting'),null],[t('Bootstrapper.Status.Installing',' Roblox').replace('  ',' '),.2],[t('Bootstrapper.Status.Installing','Roblox'),.55],[t('Bootstrapper.Status.ApplyingModifications'),.85],[t('Bootstrapper.Status.Starting','Roblox'),1]];
+  const P=k=>t(k).replace('{product}','Roblox');const steps=[[P('Bootstrapper.Status.Connecting'),null],[P('Bootstrapper.Status.Installing'),.2],[P('Bootstrapper.Status.Installing'),.55],[P('Bootstrapper.Status.ApplyingModifications'),.85],[P('Bootstrapper.Status.Starting'),1]];
   let i=0;el.set({message:steps[0][0],fraction:null,can_cancel:true});
   const iv=setInterval(()=>{i=(i+1)%steps.length;el.set({message:steps[i][0],fraction:steps[i][1],can_cancel:true})},1500)}
 
@@ -296,15 +304,15 @@ function Launch(){
   const win=h('div',{class:'win framed'});let phase=D.confirm?'confirm':'run';
   const view=BootView({message:'',oncancel:()=>call('cancel')});
   const confirmV=h('div',{class:'boot'},h('div',{class:'topbar'}),h('img',{class:'ic',src:window.APP_ICON,alt:''}),h('div',{class:'sp'}),
-    h('div',{class:'msg'},'Roblox wants to start a game. Launch it?'),h('div',{style:{display:'flex',gap:'8px',justifyContent:'center',marginTop:'8px',marginBottom:'16px'}},
-      Btn('Launch',{kind:'primary',cls:'',onclick:()=>{call('start');swap(view);poll()}}),Btn(t('Common.Cancel'),{onclick:()=>call('cancel')})));
+    h('div',{class:'msg'},t('X.Launch.Confirm')),h('div',{style:{display:'flex',gap:'8px',justifyContent:'center',marginTop:'8px',marginBottom:'16px'}},
+      Btn(t('X.Launch.Btn'),{kind:'primary',cls:'',onclick:()=>{call('start');swap(view);poll()}}),Btn(t('Common.Cancel'),{onclick:()=>call('cancel')})));
   const errV=h('div',{class:'boot'},h('div',{class:'topbar'}));
   const swap=v=>{win.innerHTML='';win.append(v)};
   swap(phase==='confirm'?confirmV:view);document.title=D.title||NAME;
   async function poll(){
     const s=await call('progress');if(!s)return setTimeout(poll,100);
     if(s.finished!=null&&s.error){errV.innerHTML='';errV.append(h('div',{class:'topbar'}),h('img',{class:'ic',src:window.APP_ICON,alt:''}),h('div',{class:'sp'}),
-      h('div',{class:'msg',style:{color:'var(--crit)'}},'Something went wrong'),h('div',{class:'t3',style:{textAlign:'center',fontSize:'12px',marginBottom:'10px',maxHeight:'60px',overflow:'auto'}},s.error),
+      h('div',{class:'msg',style:{color:'var(--crit)'}},t('X.Launch.Wrong')),h('div',{class:'t3',style:{textAlign:'center',fontSize:'12px',marginBottom:'10px',maxHeight:'60px',overflow:'auto'}},s.error),
       h('div',{class:'pb err pbw',style:{marginBottom:'16px'}},h('div',{class:'v',style:{width:'100%'}})),Btn(t('Common.Close'),{cls:'',onclick:()=>call('win',{op:'close',force:true})}));
       errV.querySelector('.btn').style.cssText='width:120px;align-self:center';swap(errV);return}
     if(s.finished!=null){call('win',{op:'close',force:true});return}

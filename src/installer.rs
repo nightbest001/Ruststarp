@@ -6,6 +6,7 @@ use std::os::windows::process::CommandExt;
 use std::process::Command;
 
 use crate::app::{self, error_code, PROJECT_NAME};
+use crate::lang::pick;
 use crate::{paths, registry, shortcuts};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -82,7 +83,10 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
     const IDENT: &str = "Installer::DoUninstall";
     let p = paths::get();
 
-    if !quiet && !confirm(&format!("Uninstall {PROJECT_NAME}? Roblox will be removed too.")) {
+    if !quiet && !confirm(&pick(
+        &format!("Uninstall {PROJECT_NAME}? Roblox will be removed too."),
+        &format!("Uninstall {PROJECT_NAME}? Roblox ikut kehapus juga."),
+    )) {
         return error_code::INSTALL_USER_EXIT;
     }
 
@@ -127,7 +131,10 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
         .spawn();
 
     if !quiet {
-        notify(&format!("{PROJECT_NAME} has been uninstalled."));
+        notify(&pick(
+            &format!("{PROJECT_NAME} has been uninstalled."),
+            &format!("{PROJECT_NAME} udah di-uninstall."),
+        ));
     }
     error_code::SUCCESS
 }

@@ -4,7 +4,7 @@
 //! window, so layout, icons and animation match Bloxstrap's WPF-UI. It is a GUI-subsystem program: no terminal opens on double-click or from a roblox:// link. When it
 //! is started from cmd/PowerShell with a subcommand, it borrows that console for the text output.
 //!
-//! Differences from the original: no Discord Rich Presence (removed), no bootstrapper styles / languages.
+//! Differences from the original: no bootstrapper styles / languages.
 //! Ruststrap updates itself from GitHub Releases (`updater.rs`): the window shows a banner when a newer version exists.
 //! The launch/update/modification pipeline, FastFlags, activity tracking and the roblox:// protocol handlers
 //! are ported.
@@ -23,10 +23,12 @@ mod app;
 mod bootstrapper;
 mod console;
 mod deployment;
+mod discord;
 mod fast_flags;
 mod gpu;
 mod installer;
 mod json_manager;
+mod lang;
 mod launch_settings;
 mod logger;
 mod menu;
@@ -85,6 +87,7 @@ fn real_main() -> i32 {
     logger::initialize(&paths::get().logs, if is_watcher { "Watcher" } else { "Ruststrap" });
     crate::log!("App::Main", "Ruststrap {} starting", app::VERSION);
     app::load_all();
+    lang::init(&app::settings().prop.language);
 
     // leftovers of a self-update, and a registry entry that still names the old version
     let uninstalling = args.iter().any(|a| matches!(a.as_str(), "uninstall" | "-uninstall"));

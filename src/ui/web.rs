@@ -24,6 +24,7 @@ use wry::{NewWindowResponse, WebContext, WebViewBuilder, WebViewBuilderExtWindow
 use crate::app::{self, error_code, PROJECT_DOWNLOAD_LINK, PROJECT_HELP_LINK, PROJECT_NAME, PROJECT_SUPPORT_LINK};
 use crate::bootstrapper::Bootstrapper;
 use crate::models::{CustomIntegration, FastFlags, LaunchMode, Settings};
+use crate::lang::pick;
 use crate::{fast_flags, gpu, installer, paths, progress, registry, shortcuts, updater};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -121,8 +122,12 @@ fn settings_to_json(s: &Settings) -> Value {
         "use_fast_flag_manager": s.use_fast_flag_manager,
         "enable_activity_tracking": s.enable_activity_tracking,
         "use_disable_app_patch": s.use_disable_app_patch,
+        "use_discord_rich_presence": s.use_discord_rich_presence,
+        "allow_activity_joining": s.allow_activity_joining,
+        "show_account_on_rich_presence": s.show_account_on_rich_presence,
         "gpu_preference": s.gpu_preference,
         "theme": s.theme,
+        "language": s.language,
         "bootstrapper_title": s.bootstrapper_title,
         "debug_disable_version_package_cleanup": s.debug_disable_version_package_cleanup,
         "custom_integrations": ints,
@@ -137,10 +142,17 @@ fn apply_settings_json(s: &mut Settings, v: &Value) {
     s.use_fast_flag_manager = b("use_fast_flag_manager", s.use_fast_flag_manager);
     s.enable_activity_tracking = b("enable_activity_tracking", s.enable_activity_tracking);
     s.use_disable_app_patch = b("use_disable_app_patch", s.use_disable_app_patch);
+    s.use_discord_rich_presence = b("use_discord_rich_presence", s.use_discord_rich_presence);
+    s.allow_activity_joining = b("allow_activity_joining", s.allow_activity_joining);
+    s.show_account_on_rich_presence = b("show_account_on_rich_presence", s.show_account_on_rich_presence);
     s.debug_disable_version_package_cleanup =
         b("debug_disable_version_package_cleanup", s.debug_disable_version_package_cleanup);
     s.gpu_preference = st("gpu_preference", &s.gpu_preference.clone());
     s.theme = st("theme", &s.theme.clone());
+    s.language = st("language", &s.language.clone());
+    if !matches!(s.language.as_str(), "system" | "en" | "id") {
+        s.language = "system".to_string();
+    }
     s.bootstrapper_title = st("bootstrapper_title", &s.bootstrapper_title.clone());
     if let Some(arr) = v.get("custom_integrations").and_then(Value::as_array) {
         s.custom_integrations = arr
@@ -200,6 +212,7 @@ fn init_json(mode: Mode) -> Value {
         "version": app::VERSION,
         "installed": installed,
         "can_update": matches!(mode, Mode::Home | Mode::Settings) && paths::running_installed_copy(),
+        "system_lang": if crate::lang::system_is_indonesian() { "id" } else { "en" },
         "already_running": false,
         "settings": settings_to_json(&settings),
         "force_reinstall": app::state().prop.force_reinstall,
@@ -240,8 +253,8 @@ fn arg_bool(a: &Value, k: &str) -> bool {
 
 fn run_install(dir: String, desktop: bool, start_menu: bool) -> Result<(), String> {
     let dir = dir.trim().to_string();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create {dir}: {e}"))?;
-    registry::set_install_location(&dir).map_err(|e| format!("Cannot write the registry: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| pick(&format!("Cannot create {dir}: {e}"), &format!("Gagal bikin folder {dir}: {e}")))?;
+    registry::set_install_location(&dir).map_err(|e| pick(&format!("Cannot write the registry: {e}"), &format!("Gagal nulis ke registry: {e}")))?;
     let mut c = Command::new(paths::process());
     c.arg("install").arg("-quiet");
     if desktop {
@@ -250,16 +263,23 @@ fn run_install(dir: String, desktop: bool, start_menu: bool) -> Result<(), Strin
     if start_menu {
         c.arg("-startmenu");
     }
-    let out = c.creation_flags(CREATE_NO_WINDOW).output().map_err(|e| format!("Cannot start the installer: {e}"))?;
+    let out = c.creation_flags(CREATE_NO_WINDOW).output().map_err(|e| pick(&format!("Cannot start the installer: {e}"), &format!("Gagal menjalankan installer: {e}")))?;
     match out.status.code() {
         Some(code) if code == error_code::SUCCESS => {
             *INSTALLED_EXE.lock().unwrap() = Some(PathBuf::from(&dir).join(format!("{PROJECT_NAME}.exe")));
             Ok(())
         }
-        _ => Err(format!(
-            "{PROJECT_NAME} has been installed to this location before and is still present, however the installer \
-             cannot overwrite the old executable.\n\nPlease manually delete {PROJECT_NAME}.exe from the install \
-             location or try restarting your system, and then retry installation afterwards."
+        _ => Err(pick(
+            &format!(
+                "{PROJECT_NAME} has been installed to this location before and is still present, however the installer \
+                 cannot overwrite the old executable.\n\nPlease manually delete {PROJECT_NAME}.exe from the install \
+                 location or try restarting your system, and then retry installation afterwards."
+            ),
+            &format!(
+                "{PROJECT_NAME} pernah dipasang di folder ini dan filenya masih ada, tapi installer nggak bisa menimpa \
+                 file lama itu.\n\nHapus {PROJECT_NAME}.exe dari folder tersebut secara manual atau restart \
+                 komputermu, lalu coba pasang lagi."
+            ),
         )),
     }
 }
@@ -293,6 +313,7 @@ fn save(a: &Value) -> Result<Value, String> {
         ff.prop = flags;
         ff.save();
     }
+    crate::lang::init(&app::settings().prop.language);
     let mut want = [false; 5];
     if let Some(arr) = a.get("shortcuts").and_then(Value::as_array) {
         for (i, v) in arr.iter().take(5).enumerate() {
@@ -357,14 +378,14 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
             if installer::install(true) == error_code::SUCCESS {
                 Ok(Value::Null)
             } else {
-                Err("Install failed, see the log".into())
+                Err(pick("Install failed, see the log", "Pemasangan gagal, cek lognya"))
             }
         }
         "uninstall" => {
             if installer::uninstall(true, arg_bool(a, "keep_data")) == error_code::SUCCESS {
                 Ok(Value::Null)
             } else {
-                Err("Uninstall failed, see the log".into())
+                Err(pick("Uninstall failed, see the log", "Uninstall gagal, cek lognya"))
             }
         }
         "check_update" => match updater::check() {

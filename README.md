@@ -18,7 +18,7 @@ Bukan produk resmi Roblox.
 | Kebutuhan | .NET Desktop Runtime | tidak ada |
 | Antarmuka | jendela dan tray | jendela (WebView2, HTML/CSS/JS), tanpa tray |
 | Pengaturan | layar settings | jendela pengaturan, atau file JSON dan perintah `flags` |
-| Discord Rich Presence | ada | dihapus |
+| Discord Rich Presence | ada | ada (tanpa tombol kustom dari BloxstrapRPC) |
 | Pilih GPU (dropdown) | tidak ada | ada |
 | Setup awal (Welcome, Install, Completion) | ada | ada |
 | Halaman Appearance | tema, bootstrapper, ikon | tema (sistem/terang/gelap) dan judul bootstrapper |
@@ -148,3 +148,9 @@ ruststrap gpu set default     # lepas, biar Windows yang pilih
 ```
 
 Pilihan ditulis ke `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` untuk `RobloxPlayerBeta.exe` dan `RobloxStudioBeta.exe`, dan ditulis ulang tiap Roblox dijalankan (folder versi baru tiap update). Jenis GPU (discrete/integrated) hasil tebakan dari nama dan VRAM.
+
+## Bahasa
+
+Jendela mendukung **English** dan **Bahasa Indonesia**. Ganti di Pengaturan > Tampilan > Bahasa
+(default: ikut bahasa Windows). Teks UI ada di `ui-web/strings.json` (EN) dan `ui-web/strings.id.json` (ID);
+setelah mengedit, jalankan `python3 ui-web/build.py`. Pesan dari sisi Rust ada di `src/lang.rs` (`pick("English", "Indonesia")`).

@@ -247,9 +247,15 @@ impl Bootstrapper {
 
         if self.no_connection {
             if must_upgrade {
-                return Err("Cannot reach the Roblox servers and Roblox is not installed (or must be reinstalled). Check your connection and try again.".into());
+                return Err(crate::lang::pick(
+                    "Cannot reach the Roblox servers and Roblox is not installed (or must be reinstalled). Check your connection and try again.",
+                    "Nggak bisa nyambung ke server Roblox, dan Roblox belum terpasang (atau perlu dipasang ulang). Cek koneksimu lalu coba lagi.",
+                ));
             }
-            app::say("No connection to Roblox servers, starting the installed version.");
+            app::say(&crate::lang::pick(
+                "No connection to Roblox servers, starting the installed version.",
+                "Nggak bisa nyambung ke server Roblox, jalanin versi yang sudah terpasang.",
+            ));
         } else if must_upgrade || guid != self.latest_guid {
             self.upgrade_roblox()?;
         }
@@ -257,7 +263,7 @@ impl Bootstrapper {
         self.apply_modifications()?;
 
         if launch.active("nolaunch") {
-            app::say("Done (-nolaunch).");
+            app::say(&crate::lang::pick("Done (-nolaunch).", "Selesai (-nolaunch)."));
             return Ok(());
         }
         self.start_roblox()
@@ -363,7 +369,10 @@ impl Bootstrapper {
         for d in [&p.base, &p.downloads, &p.versions] {
             fs::create_dir_all(d).map_err(|e| format!("cannot create {}: {e}", d.display()))?;
         }
-        app::say(&format!("Installing {} ({})...", self.app.product_name, self.latest_guid));
+        app::say(&crate::lang::pick(
+            &format!("Installing {} ({})...", self.app.product_name, self.latest_guid),
+            &format!("Memasang {} ({})...", self.app.product_name, self.latest_guid),
+        ));
 
         self.kill_roblox_instances();
         if self.latest_dir.exists() {
@@ -383,13 +392,19 @@ impl Bootstrapper {
                 return Err("Cancelled.".into());
             }
             crate::progress::set_stage(i, total);
-            app::say(&format!("Downloading {} ({}/{})", pkg.name, i + 1, total));
+            app::say(&crate::lang::pick(
+                &format!("Downloading {} ({}/{})", pkg.name, i + 1, total),
+                &format!("Mengunduh {} ({}/{})", pkg.name, i + 1, total),
+            ));
             self.download_package(pkg)?;
             crate::progress::set_stage_progress(0.8);
             if pkg.name == "WebView2RuntimeInstaller.zip" {
                 continue;
             }
-            app::say(&format!("Installing {} ({}/{})", pkg.name, i + 1, total));
+            app::say(&crate::lang::pick(
+                &format!("Installing {} ({}/{})", pkg.name, i + 1, total),
+                &format!("Memasang {} ({}/{})", pkg.name, i + 1, total),
+            ));
             self.extract_package(pkg, &self.latest_dir, None)?;
             crate::progress::set_stage_progress(1.0);
         }
@@ -398,7 +413,10 @@ impl Bootstrapper {
         fs::write(self.latest_dir.join("AppSettings.xml"), APP_SETTINGS).map_err(|e| e.to_string())?;
 
         if app::state().prop.prompt_web_view2_install && !crate::registry::webview2_installed() {
-            app::say("Note: Microsoft Edge WebView2 Runtime was not found. Install it from https://developer.microsoft.com/microsoft-edge/webview2/ if Roblox fails to show its menus.");
+            app::say(&crate::lang::pick(
+                "Note: Microsoft Edge WebView2 Runtime was not found. Install it from https://developer.microsoft.com/microsoft-edge/webview2/ if Roblox fails to show its menus.",
+                "Catatan: Microsoft Edge WebView2 Runtime nggak ketemu. Kalau menu Roblox nggak muncul, pasang dari https://developer.microsoft.com/microsoft-edge/webview2/",
+            ));
             let mut st = app::state();
             st.prop.prompt_web_view2_install = false;
         }
@@ -657,7 +675,10 @@ impl Bootstrapper {
         };
         let pid = child.id();
         crate::log!(IDENT, "Started Roblox (PID {pid}), waiting for log file");
-        app::say(&format!("Launched {}.", self.app.product_name));
+        app::say(&crate::lang::pick(
+            &format!("Launched {}.", self.app.product_name),
+            &format!("{} sudah jalan.", self.app.product_name),
+        ));
 
         let deadline = Instant::now() + Duration::from_secs(15);
         let mut log_file: Option<PathBuf> = None;
