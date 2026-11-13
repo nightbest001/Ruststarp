@@ -4,7 +4,7 @@
 //! theme. It is a GUI-subsystem program: no terminal opens on double-click or from a roblox:// link. When it
 //! is started from cmd/PowerShell with a subcommand, it borrows that console for the text output.
 //!
-//! Differences from the original: no Discord Rich Presence, no custom bootstrapper themes, no in-app updater.
+//! Differences from the original: no Discord Rich Presence (removed), no bootstrapper styles / languages, no in-app updater.
 //! The launch/update/modification pipeline, FastFlags, activity tracking and the roblox:// protocol handlers
 //! are ported.
 
@@ -32,7 +32,9 @@ mod menu;
 mod models;
 mod paths;
 mod progress;
+mod diagnostics;
 mod registry;
+mod shortcuts;
 mod ui;
 mod watcher;
 
@@ -85,15 +87,29 @@ fn real_main() -> i32 {
     match args.first().map(String::as_str) {
         Some("flags") => return fast_flags::cli(&args[1..]),
         Some("gpu") => return gpu::cli(&args[1..]),
-        Some("install") => return installer::install(args.iter().any(|a| a == "-quiet")),
+        Some("install") => {
+            let code = installer::install(args.iter().any(|a| a == "-quiet"));
+            if code == app::error_code::SUCCESS {
+                if args.iter().any(|a| a == "-desktop") {
+                    let _ = shortcuts::set(shortcuts::Kind::Desktop, true);
+                }
+                if args.iter().any(|a| a == "-startmenu") {
+                    let _ = shortcuts::set(shortcuts::Kind::StartMenu, true);
+                }
+            }
+            return code;
+        }
         Some("uninstall") => {
             return installer::uninstall(args.iter().any(|a| a == "-quiet"), args.iter().any(|a| a == "-keepdata"));
         }
         _ => {}
     }
 
-    // double-click: no arguments, open the settings window
+    // double-click: the setup wizard until Ruststrap is installed, then the settings window
     if args.is_empty() {
+        if !paths::running_installed_copy() {
+            return ui::setup::run();
+        }
         return ui::settings::run();
     }
 

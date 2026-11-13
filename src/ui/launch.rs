@@ -39,7 +39,7 @@ impl LaunchApp {
 fn bar(ui: &mut egui::Ui, fraction: Option<f32>, color: Color32) {
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 10.0), Sense::hover());
     let p = ui.painter();
-    p.rect_filled(rect, CornerRadius::same(5), BORDER);
+    p.rect_filled(rect, CornerRadius::same(5), clr_border());
     match fraction {
         Some(f) => {
             let mut r = rect;
@@ -64,13 +64,13 @@ impl eframe::App for LaunchApp {
 
         if let Some(code) = snap.finished {
             // success or the user cancelled: nothing more to say
-            if code == error_code::SUCCESS || progress::cancelled() {
+            if code == error_code::clr_success() || progress::cancelled() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
         }
 
         egui::CentralPanel::default()
-            .frame(Frame::NONE.fill(BG).stroke(Stroke::new(1.0, BORDER)).inner_margin(Margin::symmetric(32, 16)))
+            .frame(Frame::NONE.fill(clr_bg()).stroke(Stroke::new(1.0, clr_border())).inner_margin(Margin::symmetric(32, 16)))
             .show_inside(ui, |ui| {
                 // no title bar: let the whole window be dragged
                 let drag = ui.interact(ui.max_rect(), egui::Id::new("drag-window"), Sense::click_and_drag());
@@ -82,7 +82,7 @@ impl eframe::App for LaunchApp {
                 ui.painter().rect_filled(
                     egui::Rect::from_min_size(egui::pos2(top.x - 32.0, top.y - 16.0), Vec2::new(ui.max_rect().width() + 64.0, 3.0)),
                     CornerRadius::ZERO,
-                    ACCENT,
+                    clr_accent(),
                 );
 
                 ui.vertical_centered(|ui| {
@@ -93,7 +93,7 @@ impl eframe::App for LaunchApp {
                     let failed = snap.error.is_some() && snap.finished.is_some();
                     match self.phase {
                         Phase::Confirm => {
-                            ui.label(RichText::new("Roblox wants to start a game. Launch it?").size(18.0).color(TEXT));
+                            ui.label(RichText::new("Roblox wants to start a game. Launch it?").size(18.0).color(clr_text()));
                             ui.add_space(22.0);
                             ui.horizontal(|ui| {
                                 ui.add_space((ui.available_width() - 216.0) / 2.0);
@@ -108,10 +108,10 @@ impl eframe::App for LaunchApp {
                         }
                         Phase::Running if failed => {
                             let msg = snap.error.clone().unwrap_or_default();
-                            ui.label(RichText::new("Something went wrong").size(18.0).color(DANGER));
-                            ui.label(RichText::new(msg).small().color(MUTED));
+                            ui.label(RichText::new("Something went wrong").size(18.0).color(clr_danger()));
+                            ui.label(RichText::new(msg).small().color(clr_muted()));
                             ui.add_space(10.0);
-                            bar(ui, Some(1.0), DANGER);
+                            bar(ui, Some(1.0), clr_danger());
                             ui.add_space(12.0);
                             if widgets::button(ui, "Close").clicked() {
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -119,9 +119,9 @@ impl eframe::App for LaunchApp {
                         }
                         Phase::Running => {
                             let text = if snap.message.is_empty() { "Starting...".to_string() } else { snap.message.clone() };
-                            ui.label(RichText::new(text).size(18.0).color(TEXT));
+                            ui.label(RichText::new(text).size(18.0).color(clr_text()));
                             ui.add_space(8.0);
-                            bar(ui, snap.fraction, ACCENT);
+                            bar(ui, snap.fraction, clr_accent());
                             ui.add_space(14.0);
                             ui.add_enabled_ui(snap.can_cancel, |ui| {
                                 if widgets::button(ui, "Cancel").clicked() {
@@ -135,7 +135,7 @@ impl eframe::App for LaunchApp {
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        BG.to_normalized_gamma_f32()
+        clr_bg().to_normalized_gamma_f32()
     }
 }
 
@@ -146,11 +146,17 @@ pub fn run(mode: LaunchMode) -> i32 {
         s.prop.confirm_launches && !app::launch().roblox_launch_args.is_empty() && mode == LaunchMode::Player
     };
 
-    let opts = super::native_options(PROJECT_NAME, [500.0, 280.0], [500.0, 280.0], false, false);
+    let (title, theme) = {
+        let s = app::settings();
+        let t = s.prop.bootstrapper_title.trim().to_string();
+        (if t.is_empty() { PROJECT_NAME.to_string() } else { t }, s.prop.theme.clone())
+    };
+    let opts = super::native_options(&title, [500.0, 280.0], [500.0, 280.0], false, false);
     let res = eframe::run_native(
-        PROJECT_NAME,
+        &title,
         opts,
         Box::new(move |cc| {
+            super::theme::set_mode(&theme);
             super::theme::apply(&cc.egui_ctx);
             let logo = super::icon_texture(&cc.egui_ctx);
             let mut a = LaunchApp { mode, logo, phase: if ask { Phase::Confirm } else { Phase::Running } };

@@ -11,7 +11,6 @@ use std::time::{Duration, Instant};
 use chrono::{DateTime, Utc};
 use regex::Regex;
 
-const GAME_MESSAGE_ENTRY: &str = "[FLog::CreatorOutput] [BloxstrapRPC]";
 const GAME_JOINING_ENTRY: &str = "[FLog::Output] ! Joining game";
 const GAME_TELEPORTING_ENTRY: &str = "[FLog::UgcExperienceController] UgcExperienceController: doTeleport: joinScriptUrl";
 const GAME_JOINING_UNIVERSE_ENTRY: &str = "[FLog::GameJoinLoadTime] Report game_join_loadtime:";
@@ -211,8 +210,6 @@ impl ActivityWatcher {
                         }
                     }
                 }
-            } else if msg.starts_with(GAME_MESSAGE_ENTRY) {
-                // BloxstrapRPC messages only matter for Discord Rich Presence, which Ruststrap does not implement.
             }
         }
     }

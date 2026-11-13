@@ -81,6 +81,7 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
         let _ = fs::remove_file(f);
     }
     registry::delete_uninstall_entry();
+    registry::clear_install_location();
 
     // the running exe cannot delete itself: let cmd.exe do it after we exit
     let robloxless = !player_left && !studio_left;

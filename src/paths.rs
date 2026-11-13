@@ -30,7 +30,18 @@ pub fn process() -> PathBuf {
 
 /// `%LOCALAPPDATA%\Ruststrap`
 pub fn default_base() -> PathBuf {
+    crate::registry::install_location().map(PathBuf::from).unwrap_or_else(|| local_app_data().join(PROJECT_NAME))
+}
+
+/// The folder Ruststrap is installed to when nothing else was chosen.
+pub fn standard_base() -> PathBuf {
     local_app_data().join(PROJECT_NAME)
+}
+
+/// True when the running exe is the installed copy.
+pub fn running_installed_copy() -> bool {
+    let norm = |p: &std::path::Path| p.to_string_lossy().to_lowercase().replace('/', "\\");
+    norm(&process()) == norm(&get().application)
 }
 
 pub fn init(base: PathBuf) {

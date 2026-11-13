@@ -154,3 +154,26 @@ pub fn write_uninstall_entry(app_path: &str, base: &str) -> io::Result<()> {
 pub fn delete_uninstall_entry() {
     let _ = hkcu().delete_subkey_all(UNINSTALL_KEY);
 }
+
+// ------------------------------------------------------------------ install location
+
+const APP_KEY: &str = r"Software\Ruststrap";
+
+/// Where the setup wizard installed Ruststrap, when it is not the default folder.
+pub fn install_location() -> Option<String> {
+    hkcu()
+        .open_subkey(APP_KEY)
+        .ok()?
+        .get_value::<String, _>("InstallLocation")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+}
+
+pub fn set_install_location(path: &str) -> io::Result<()> {
+    let (k, _) = hkcu().create_subkey(APP_KEY)?;
+    k.set_value("InstallLocation", &path)
+}
+
+pub fn clear_install_location() {
+    let _ = hkcu().delete_subkey_all(APP_KEY);
+}

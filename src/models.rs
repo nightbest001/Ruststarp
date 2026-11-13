@@ -44,6 +44,10 @@ pub struct Settings {
     pub use_disable_app_patch: bool,
     /// "default" | "saving" | "high"; see `gpu.rs`.
     pub gpu_preference: String,
+    /// "system" | "light" | "dark"
+    pub theme: String,
+    /// Text shown as the title of the launch window.
+    pub bootstrapper_title: String,
     pub debug_disable_version_package_cleanup: bool,
     pub custom_integrations: Vec<CustomIntegration>,
 }
@@ -57,6 +61,8 @@ impl Default for Settings {
             enable_activity_tracking: true,
             use_disable_app_patch: false,
             gpu_preference: "default".to_string(),
+            theme: "system".to_string(),
+            bootstrapper_title: crate::app::PROJECT_NAME.to_string(),
             debug_disable_version_package_cleanup: false,
             custom_integrations: Vec::new(),
         }

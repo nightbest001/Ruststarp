@@ -3,6 +3,7 @@
 pub mod launch;
 pub mod pages;
 pub mod settings;
+pub mod setup;
 pub mod theme;
 pub mod widgets;
 

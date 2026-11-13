@@ -18,7 +18,11 @@ Bukan produk resmi Roblox.
 | Kebutuhan | .NET Desktop Runtime | tidak ada |
 | Antarmuka | jendela dan tray | jendela (egui), tanpa tray |
 | Pengaturan | layar settings | jendela pengaturan, atau file JSON dan perintah `flags` |
-| Discord Rich Presence | ada | belum |
+| Discord Rich Presence | ada | dihapus |
+| Pilih GPU (dropdown) | tidak ada | ada |
+| Setup awal (Welcome, Install, Completion) | ada | ada |
+| Halaman Appearance | tema, bootstrapper, ikon | tema (sistem/terang/gelap) dan judul bootstrapper |
+| Export diagnostic data | ada | ada |
 
 ## Cara pakai
 
@@ -94,7 +98,7 @@ src/models.rs            Settings, State, manifest paket
 
 ## Yang belum ada
 
-Ikon di tray, Discord Rich Presence, tema bootstrapper, update otomatis, shortcut, preset mod
+Ikon di tray, gaya bootstrapper dan ikon kustom, bahasa, analytics, extract ikon, update otomatis, preset mod
 (emoji, kursor, font), updater latar, dan pemasangan WebView2 otomatis.
 
 ## Build

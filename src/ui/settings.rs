@@ -10,7 +10,7 @@ use super::theme::*;
 use super::widgets;
 use crate::app::{self, PROJECT_NAME};
 use crate::models::{FastFlags, Settings};
-use crate::{fast_flags, gpu, installer, paths};
+use crate::{fast_flags, gpu, installer, paths, shortcuts};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Page {
@@ -19,6 +19,8 @@ pub enum Page {
     Mods,
     FastFlags,
     FastFlagEditor,
+    Appearance,
+    Shortcuts,
     Gpu,
     Ruststrap,
     About,
@@ -39,6 +41,10 @@ pub struct SettingsApp {
     pub new_flag_name: String,
     pub new_flag_value: String,
     pub adapters: Vec<gpu::Adapter>,
+    /// Desktop, Start Menu, Play, Studio, Settings (same order as `shortcuts::ALL`).
+    pub shortcuts: [bool; 5],
+    pub export_config: bool,
+    pub export_logs: bool,
     pub sel_integration: Option<usize>,
     pub toast: Option<(String, bool, Instant)>,
     pub modal: Option<Modal>,
@@ -50,8 +56,9 @@ pub struct SettingsApp {
 
 impl SettingsApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        super::theme::apply(&cc.egui_ctx);
         let settings = app::settings().prop.clone();
+        super::theme::set_mode(&settings.theme);
+        super::theme::apply(&cc.egui_ctx);
         let force_reinstall = app::state().prop.force_reinstall;
         let flags = app::fast_flags().prop.clone();
         let mut a = Self {
@@ -63,6 +70,9 @@ impl SettingsApp {
             new_flag_name: String::new(),
             new_flag_value: String::new(),
             adapters: gpu::detect(),
+            shortcuts: shortcuts::current(),
+            export_config: true,
+            export_logs: true,
             sel_integration: None,
             toast: None,
             modal: None,
@@ -78,7 +88,7 @@ impl SettingsApp {
     fn snapshot_json(&self) -> String {
         let s = serde_json::to_string(&self.settings).unwrap_or_default();
         let f = serde_json::to_string(&self.flags).unwrap_or_default();
-        format!("{s}|{f}|{}", self.force_reinstall)
+        format!("{s}|{f}|{}|{:?}", self.force_reinstall, self.shortcuts)
     }
 
     pub fn dirty(&self) -> bool {
@@ -108,12 +118,13 @@ impl SettingsApp {
             ff.prop = self.flags.clone();
             ff.save();
         }
-        let failed = gpu::apply_installed(pref);
+        let mut failed = gpu::apply_installed(pref);
+        failed.extend(shortcuts::apply(&self.shortcuts));
         self.saved_json = self.snapshot_json();
         if failed.is_empty() {
             self.say("Settings saved", true);
         } else {
-            self.say("Saved, but the GPU preference could not be written", false);
+            self.say("Saved, but something could not be written, see the log", false);
         }
     }
 
@@ -124,11 +135,11 @@ impl SettingsApp {
         if active {
             p.rect_filled(rect, CornerRadius::same(6), Color32::from_rgba_unmultiplied(0xE5, 0x57, 0x1B, 40));
             let bar = egui::Rect::from_min_size(egui::pos2(rect.left() + 2.0, rect.top() + 9.0), Vec2::new(3.0, 20.0));
-            p.rect_filled(bar, CornerRadius::same(2), ACCENT);
+            p.rect_filled(bar, CornerRadius::same(2), clr_accent());
         } else if resp.hovered() {
-            p.rect_filled(rect, CornerRadius::same(6), CARD);
+            p.rect_filled(rect, CornerRadius::same(6), clr_card());
         }
-        let color = if active { Color32::WHITE } else { TEXT };
+        let color = if active && !super::theme::is_light() { Color32::WHITE } else if active { clr_accent_deep() } else { clr_text() };
         p.text(
             egui::pos2(rect.left() + 18.0, rect.center().y),
             Align2::LEFT_CENTER,
@@ -147,13 +158,15 @@ impl SettingsApp {
     fn nav(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.add(egui::Image::new(&self.logo).fit_to_exact_size(Vec2::splat(34.0)));
-            ui.label(RichText::new(PROJECT_NAME).size(19.0).strong().color(TEXT));
+            ui.label(RichText::new(PROJECT_NAME).size(19.0).strong().color(clr_text()));
         });
         ui.add_space(14.0);
         self.nav_item(ui, Page::Integrations, "Integrations");
         self.nav_item(ui, Page::Behaviour, "Behaviour");
         self.nav_item(ui, Page::Mods, "Mods");
         self.nav_item(ui, Page::FastFlags, "FastFlags");
+        self.nav_item(ui, Page::Appearance, "Appearance");
+        self.nav_item(ui, Page::Shortcuts, "Shortcuts");
         self.nav_item(ui, Page::Gpu, "GPU");
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(4.0);
@@ -165,11 +178,11 @@ impl SettingsApp {
     fn bottom_bar(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.horizontal_centered(|ui| {
             if !self.installed {
-                ui.label(RichText::new("Not installed yet: open the Ruststrap page and press Install.").color(ACCENT_HOVER));
+                ui.label(RichText::new("Not installed yet: open the Ruststrap page and press Install.").color(clr_accent_hover()));
             } else if self.dirty() {
-                ui.label(RichText::new("You have unsaved changes").color(ACCENT_HOVER));
+                ui.label(RichText::new("You have unsaved changes").color(clr_accent_hover()));
             } else {
-                ui.label(RichText::new("All changes saved").color(MUTED));
+                ui.label(RichText::new("All changes saved").color(clr_muted()));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if widgets::button(ui, "Close").clicked() {
@@ -207,12 +220,12 @@ impl SettingsApp {
                     .order(egui::Order::Foreground)
                     .show(ctx, |ui| {
                         Frame::NONE
-                            .fill(CARD_HOVER)
-                            .stroke(Stroke::new(1.0, if ok { SUCCESS } else { DANGER }))
+                            .fill(clr_card_hover())
+                            .stroke(Stroke::new(1.0, if ok { clr_success() } else { clr_danger() }))
                             .corner_radius(CornerRadius::same(8))
                             .inner_margin(Margin::symmetric(16, 10))
                             .show(ui, |ui| {
-                                ui.label(RichText::new(msg).color(TEXT));
+                                ui.label(RichText::new(msg).color(clr_text()));
                             });
                     });
                 ctx.request_repaint_after(Duration::from_millis(200));
@@ -235,9 +248,9 @@ impl SettingsApp {
         let mut action: Option<u8> = None; // 1 = confirm, 2 = discard, 0 = cancel
         egui::Modal::new(egui::Id::new("modal")).show(ctx, |ui| {
             ui.set_width(360.0);
-            ui.label(RichText::new(title).size(18.0).strong().color(TEXT));
+            ui.label(RichText::new(title).size(18.0).strong().color(clr_text()));
             ui.add_space(4.0);
-            ui.label(RichText::new(body).color(MUTED));
+            ui.label(RichText::new(body).color(clr_muted()));
             ui.add_space(14.0);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if kind == 2 {
@@ -264,7 +277,7 @@ impl SettingsApp {
         match (kind, act) {
             (0, 1) => {
                 let code = installer::uninstall(true, false);
-                if code == app::error_code::SUCCESS {
+                if code == app::error_code::clr_success() {
                     self.force_close = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 } else {
@@ -290,6 +303,13 @@ impl eframe::App for SettingsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
 
+        // theme preview: follows the Appearance dropdown right away
+        let want_light = super::theme::mode_is_light(&self.settings.theme);
+        if want_light != super::theme::is_light() {
+            super::theme::set_light(want_light);
+            super::theme::apply(&ctx);
+        }
+
         // ask before throwing unsaved changes away
         if ctx.input(|i| i.viewport().close_requested()) && !self.force_close && self.dirty() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -298,17 +318,17 @@ impl eframe::App for SettingsApp {
 
         egui::Panel::bottom("bar")
             .exact_size(56.0)
-            .frame(Frame::NONE.fill(PANEL).inner_margin(Margin::symmetric(18, 8)))
+            .frame(Frame::NONE.fill(clr_panel()).inner_margin(Margin::symmetric(18, 8)))
             .show_inside(ui, |ui| self.bottom_bar(ui, &ctx));
 
         egui::Panel::left("nav")
             .exact_size(210.0)
             .resizable(false)
-            .frame(Frame::NONE.fill(PANEL).inner_margin(Margin::symmetric(12, 14)))
+            .frame(Frame::NONE.fill(clr_panel()).inner_margin(Margin::symmetric(12, 14)))
             .show_inside(ui, |ui| self.nav(ui));
 
         egui::CentralPanel::default()
-            .frame(Frame::NONE.fill(BG).inner_margin(Margin::symmetric(26, 16)))
+            .frame(Frame::NONE.fill(clr_bg()).inner_margin(Margin::symmetric(26, 16)))
             .show_inside(ui, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                     match self.page {
@@ -317,6 +337,8 @@ impl eframe::App for SettingsApp {
                         Page::Mods => self.page_mods(ui),
                         Page::FastFlags => self.page_fastflags(ui),
                         Page::FastFlagEditor => self.page_flag_editor(ui),
+                        Page::Appearance => self.page_appearance(ui),
+                        Page::Shortcuts => self.page_shortcuts(ui),
                         Page::Gpu => self.page_gpu(ui),
                         Page::Ruststrap => self.page_ruststrap(ui),
                         Page::About => self.page_about(ui),
@@ -329,7 +351,7 @@ impl eframe::App for SettingsApp {
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        BG.to_normalized_gamma_f32()
+        clr_bg().to_normalized_gamma_f32()
     }
 }
 

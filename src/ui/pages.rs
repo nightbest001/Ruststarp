@@ -33,7 +33,7 @@ impl SettingsApp {
         );
 
         section_title(ui, "Custom integrations");
-        ui.label(RichText::new("Programs that start together with Roblox.").color(MUTED));
+        ui.label(RichText::new("Programs that start together with Roblox.").color(clr_muted()));
         ui.add_space(6.0);
 
         card(ui, |ui| {
@@ -70,13 +70,13 @@ impl SettingsApp {
                 ui.vertical(|ui| {
                     let idx = self.sel_integration.filter(|i| *i < self.settings.custom_integrations.len());
                     let Some(i) = idx else {
-                        ui.label(RichText::new("Pick an integration, or press New.").color(MUTED));
+                        ui.label(RichText::new("Pick an integration, or press New.").color(clr_muted()));
                         return;
                     };
                     let it = &mut self.settings.custom_integrations[i];
-                    ui.label(RichText::new("Name").color(MUTED));
+                    ui.label(RichText::new("Name").color(clr_muted()));
                     ui.add(egui::TextEdit::singleline(&mut it.name).desired_width(f32::INFINITY));
-                    ui.label(RichText::new("App location").color(MUTED));
+                    ui.label(RichText::new("App location").color(clr_muted()));
                     ui.horizontal(|ui| {
                         ui.add(egui::TextEdit::singleline(&mut it.location).desired_width(ui.available_width() - 100.0));
                         if button(ui, "Browse").clicked() {
@@ -85,7 +85,7 @@ impl SettingsApp {
                             }
                         }
                     });
-                    ui.label(RichText::new("Launch arguments").color(MUTED));
+                    ui.label(RichText::new("Launch arguments").color(clr_muted()));
                     ui.add(egui::TextEdit::multiline(&mut it.launch_args).desired_rows(3).desired_width(f32::INFINITY));
                     ui.horizontal(|ui| {
                         toggle(ui, &mut it.auto_close);
@@ -139,15 +139,18 @@ impl SettingsApp {
                 }
             },
         );
+        setting_row(ui, "Help", "Read how the mods folder works.", |ui| {
+            ui.hyperlink_to("Open help", crate::app::PROJECT_HELP_LINK);
+        });
         card(ui, |ui| {
-            ui.label(RichText::new("How it works").strong().color(TEXT));
+            ui.label(RichText::new("How it works").strong().color(clr_text()));
             ui.label(
                 RichText::new(
                     "Every file you put in the mods folder replaces the file with the same path inside the Roblox folder. \
                      For example, content\\sounds\\ouch.ogg changes the death sound. Delete the file and the original \
                      comes back the next time Roblox starts through Ruststrap.",
                 )
-                .color(MUTED),
+                .color(clr_muted()),
             );
         });
     }
@@ -269,7 +272,7 @@ impl SettingsApp {
         });
 
         card(ui, |ui| {
-            ui.label(RichText::new("Add a flag").strong().color(TEXT));
+            ui.label(RichText::new("Add a flag").strong().color(clr_text()));
             ui.horizontal(|ui| {
                 ui.add(egui::TextEdit::singleline(&mut self.new_flag_name).hint_text("Name").desired_width(280.0));
                 ui.add(egui::TextEdit::singleline(&mut self.new_flag_value).hint_text("Value").desired_width(160.0));
@@ -293,12 +296,12 @@ impl SettingsApp {
             .cloned()
             .collect();
         if keys.is_empty() {
-            ui.label(RichText::new("No flags.").color(MUTED));
+            ui.label(RichText::new("No flags.").color(clr_muted()));
         }
         let mut remove: Option<String> = None;
         for k in keys {
             ui.horizontal(|ui| {
-                ui.add_sized([360.0, 28.0], egui::Label::new(RichText::new(&k).monospace().color(TEXT)).truncate());
+                ui.add_sized([360.0, 28.0], egui::Label::new(RichText::new(&k).monospace().color(clr_text())).truncate());
                 let mut v = fast_flags::get_value(&self.flags, &k).unwrap_or_default();
                 if ui.add(egui::TextEdit::singleline(&mut v).desired_width(160.0)).changed() {
                     self.flags.insert(k.clone(), serde_json::Value::String(v));
@@ -313,6 +316,63 @@ impl SettingsApp {
         }
     }
 
+    // ------------------------------------------------------------ Appearance
+    pub fn page_appearance(&mut self, ui: &mut egui::Ui) {
+        page_header(ui, "Appearance", "Configure how Ruststrap should look.");
+
+        let theme_name = |v: &str| match v {
+            "light" => "Light",
+            "dark" => "Dark",
+            _ => "System default",
+        };
+        let mut theme = self.settings.theme.clone();
+        setting_row(ui, "Global Theme", "", |ui| {
+            egui::ComboBox::from_id_salt("theme")
+                .width(150.0)
+                .selected_text(theme_name(&theme))
+                .show_ui(ui, |ui| {
+                    for v in ["system", "light", "dark"] {
+                        ui.selectable_value(&mut theme, v.to_string(), theme_name(v));
+                    }
+                });
+        });
+        if theme != self.settings.theme {
+            self.settings.theme = theme;
+        }
+
+        section_title(ui, "Bootstrapper");
+        ui.label(RichText::new("The window that shows while Roblox starts or updates.").color(clr_muted()));
+        ui.add_space(6.0);
+        setting_row(ui, "Title", "The text that shows as the title of the bootstrapper.", |ui| {
+            ui.add(egui::TextEdit::singleline(&mut self.settings.bootstrapper_title).desired_width(170.0));
+        });
+    }
+
+    // ------------------------------------------------------------ Shortcuts
+    pub fn page_shortcuts(&mut self, ui: &mut egui::Ui) {
+        page_header(ui, "Shortcuts", "Configure how Ruststrap can be readily launched.");
+
+        section_title(ui, "General");
+        ui.label(RichText::new("These are the shortcuts that open Ruststrap.").color(clr_muted()));
+        ui.add_space(4.0);
+        ui.columns(2, |cols| {
+            option_cell(&mut cols[0], "Desktop icon", &mut self.shortcuts[0]);
+            option_cell(&mut cols[1], "Start Menu icon", &mut self.shortcuts[1]);
+        });
+
+        section_title(ui, "Function");
+        ui.label(
+            RichText::new("Create shortcuts for quick access to specific functions. These will all be placed on the Desktop.")
+                .color(clr_muted()),
+        );
+        ui.add_space(4.0);
+        ui.columns(3, |cols| {
+            option_cell(&mut cols[0], "Launch Roblox", &mut self.shortcuts[2]);
+            option_cell(&mut cols[1], "Launch Roblox Studio", &mut self.shortcuts[3]);
+            option_cell(&mut cols[2], "Ruststrap Settings", &mut self.shortcuts[4]);
+        });
+    }
+
     // ------------------------------------------------------------ GPU
     pub fn page_gpu(&mut self, ui: &mut egui::Ui) {
         page_header(ui, "GPU", "Pick which graphics card Roblox uses. Useful on laptops with two GPUs.");
@@ -320,7 +380,7 @@ impl SettingsApp {
         section_title(ui, "Detected");
         if self.adapters.is_empty() {
             card(ui, |ui| {
-                ui.label(RichText::new("No GPU was found in the registry.").color(MUTED));
+                ui.label(RichText::new("No GPU was found in the registry.").color(clr_muted()));
             });
         }
         for a in &self.adapters {
@@ -331,32 +391,42 @@ impl SettingsApp {
             };
             let vram = a.vram_mb.map(|m| format!("{m} MB")).unwrap_or_else(|| "VRAM unknown".into());
             card(ui, |ui| {
-                ui.label(RichText::new(&a.name).strong().color(TEXT));
-                ui.label(RichText::new(format!("{}  ·  {kind}  ·  {vram}", a.vendor)).small().color(MUTED));
+                ui.label(RichText::new(&a.name).strong().color(clr_text()));
+                ui.label(RichText::new(format!("{}  ·  {kind}  ·  {vram}", a.vendor)).small().color(clr_muted()));
             });
         }
 
         section_title(ui, "Roblox should use");
         let current = gpu::Pref::parse(&self.settings.gpu_preference).unwrap_or(gpu::Pref::Default);
         let mut chosen = current;
-        for (pref, title, desc) in [
-            (gpu::Pref::Default, "Let Windows decide", "No change. Windows picks the GPU."),
-            (gpu::Pref::PowerSaving, "Power saving GPU", "Usually the integrated GPU. Longer battery life."),
-            (gpu::Pref::High, "High performance GPU", "Usually the discrete GPU (NVIDIA / AMD). Best for playing."),
-        ] {
-            setting_row(ui, title, desc, |ui| {
-                if ui.radio(chosen == pref, "").clicked() {
-                    chosen = pref;
-                }
-            });
-        }
+        let name_of = |p: gpu::Pref| match p {
+            gpu::Pref::Default => "Let Windows decide",
+            gpu::Pref::PowerSaving => "Power saving GPU",
+            gpu::Pref::High => "High performance GPU",
+        };
+        setting_row(ui, "Graphics card", "Pick the GPU Roblox runs on.", |ui| {
+            egui::ComboBox::from_id_salt("gpu_pref")
+                .width(170.0)
+                .selected_text(name_of(chosen))
+                .show_ui(ui, |ui| {
+                    for p in [gpu::Pref::Default, gpu::Pref::PowerSaving, gpu::Pref::High] {
+                        ui.selectable_value(&mut chosen, p, name_of(p));
+                    }
+                });
+        });
         if chosen != current {
             self.settings.gpu_preference = chosen.as_str().to_string();
         }
+        let hint = match chosen {
+            gpu::Pref::Default => "No change. Windows picks the GPU.",
+            gpu::Pref::PowerSaving => "Usually the integrated GPU. Longer battery life.",
+            gpu::Pref::High => "Usually the discrete GPU (NVIDIA / AMD). Best for playing.",
+        };
+        ui.label(RichText::new(hint).small().color(clr_muted()));
         ui.label(
             RichText::new("Windows keeps this per Roblox version. Ruststrap writes it again after every update.")
                 .small()
-                .color(MUTED),
+                .color(clr_muted()),
         );
     }
 
@@ -372,7 +442,7 @@ impl SettingsApp {
             |ui| {
                 if primary_button(ui, if installed { "Repair" } else { "Install" }).clicked() {
                     let code = installer::install(true);
-                    if code == crate::app::error_code::SUCCESS {
+                    if code == crate::app::error_code::clr_success() {
                         self.installed = true;
                         self.say("Ruststrap installed", true);
                     } else {
@@ -395,6 +465,36 @@ impl SettingsApp {
             }
         });
 
+        section_title(ui, "Export diagnostic data");
+        card(ui, |ui| {
+            ui.label(
+                RichText::new("Gather information that can be uploaded online to troubleshoot a problem you're having.")
+                    .color(clr_muted()),
+            );
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut self.export_config, "Ruststrap configuration");
+                ui.checkbox(&mut self.export_logs, "All Ruststrap logs");
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let can = self.export_config || self.export_logs;
+                    ui.add_enabled_ui(can, |ui| {
+                        if button(ui, "Export").clicked() {
+                            let dest = rfd::FileDialog::new()
+                                .set_file_name("Ruststrap-diagnostics.zip")
+                                .add_filter("Zip", &["zip"])
+                                .save_file();
+                            if let Some(path) = dest {
+                                match crate::diagnostics::export(&path, self.export_config, self.export_logs) {
+                                    Ok(()) => self.say("Diagnostic data exported", true),
+                                    Err(e) => self.say(&format!("Export failed: {e}"), false),
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+        });
+
         section_title(ui, "Danger zone");
         setting_row(ui, "Uninstall", "Removes Ruststrap and the Roblox it installed.", |ui| {
             if danger_button(ui, "Uninstall").clicked() {
@@ -410,8 +510,8 @@ impl SettingsApp {
             ui.horizontal(|ui| {
                 ui.add(egui::Image::new(&self.logo).fit_to_exact_size(Vec2::splat(88.0)));
                 ui.vertical(|ui| {
-                    ui.label(RichText::new(crate::app::PROJECT_NAME).size(24.0).strong().color(TEXT));
-                    ui.label(RichText::new(format!("Version {}", crate::app::VERSION)).color(MUTED));
+                    ui.label(RichText::new(crate::app::PROJECT_NAME).size(24.0).strong().color(clr_text()));
+                    ui.label(RichText::new(format!("Version {}", crate::app::VERSION)).color(clr_muted()));
                     ui.add_space(4.0);
                     ui.hyperlink_to("Source code on GitHub", crate::app::PROJECT_DOWNLOAD_LINK);
                     ui.hyperlink_to("Report a problem", crate::app::PROJECT_SUPPORT_LINK);
@@ -419,15 +519,27 @@ impl SettingsApp {
             });
         });
         card(ui, |ui| {
-            ui.label(RichText::new("Credits").strong().color(TEXT));
+            ui.label(RichText::new("Credits").strong().color(clr_text()));
             ui.label(
                 RichText::new(
                     "Ruststrap is a Rust port of Bloxstrap. The launch, update and mod pipeline comes from Bloxstrap by \
                      pizzaboxer and contributors, used under the MIT license.",
                 )
-                .color(MUTED),
+                .color(clr_muted()),
             );
             ui.hyperlink_to("Bloxstrap on GitHub", "https://github.com/bloxstraplabs/bloxstrap");
         });
     }
+}
+
+/// One card with a title on the left and a switch on the right (the grid cells of the Shortcuts page).
+fn option_cell(ui: &mut egui::Ui, title: &str, on: &mut bool) {
+    card(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(title).strong().color(clr_text()));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                toggle(ui, on);
+            });
+        });
+    });
 }
