@@ -16,8 +16,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use windows_sys::core::GUID;
 use windows_sys::Win32::System::Diagnostics::Etw::{
-    CloseTrace, ControlTraceW, EnableTraceEx2, OpenTraceW, ProcessTrace, StartTraceW, EVENT_RECORD, EVENT_TRACE_LOGFILEW,
-    EVENT_TRACE_PROPERTIES,
+    CloseTrace, ControlTraceW, EnableTraceEx2, OpenTraceW, ProcessTrace, StartTraceW, CONTROLTRACE_HANDLE, EVENT_RECORD,
+    EVENT_TRACE_LOGFILEW, EVENT_TRACE_PROPERTIES,
 };
 
 use crate::{paths, singleton};
@@ -137,7 +137,7 @@ fn stop_session(name: &[u16]) {
     let mut buf = make_props(name.len() * 2);
     // SAFETY: valid properties buffer and NUL-terminated session name.
     unsafe {
-        ControlTraceW(0, name.as_ptr(), buf.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES, EVENT_TRACE_CONTROL_STOP);
+        ControlTraceW(CONTROLTRACE_HANDLE { Value: 0 }, name.as_ptr(), buf.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES, EVENT_TRACE_CONTROL_STOP);
     }
 }
 
@@ -150,7 +150,7 @@ pub fn run() -> i32 {
     let name = singleton::wide(SESSION_NAME);
 
     let mut props = make_props(name.len() * 2);
-    let mut session: u64 = 0;
+    let mut session = CONTROLTRACE_HANDLE { Value: 0 };
     // SAFETY: valid out pointer, name and properties buffer.
     let mut status = unsafe { StartTraceW(&mut session, name.as_ptr(), props.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES) };
     if status == ERROR_ALREADY_EXISTS {
@@ -180,7 +180,7 @@ pub fn run() -> i32 {
     logfile.Anonymous2.EventRecordCallback = Some(on_event);
     // SAFETY: `logfile` and `name` stay alive until after ProcessTrace returns.
     let trace = unsafe { OpenTraceW(&mut logfile) };
-    if trace == u64::MAX {
+    if trace.Value == u64::MAX {
         crate::log!(IDENT, "OpenTrace failed");
         stop_session(&name);
         return 1;
