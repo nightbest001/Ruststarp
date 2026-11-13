@@ -175,6 +175,18 @@ fn installed_exes() -> Vec<PathBuf> {
     v
 }
 
+/// Writes `pref` for every Roblox exe that is installed now (used by the settings window).
+/// Returns one line per exe that could not be written; empty means everything worked.
+pub fn apply_installed(pref: Pref) -> Vec<String> {
+    let mut failed = Vec::new();
+    for exe in installed_exes() {
+        if let Err(e) = set_for_exe(&exe, pref) {
+            failed.push(format!("{}: {e}", exe.display()));
+        }
+    }
+    failed
+}
+
 /// Drop preference entries for old Roblox version folders that no longer exist.
 fn clean_stale() {
     let Ok(key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(PREF_KEY, KEY_READ | KEY_WRITE) else {

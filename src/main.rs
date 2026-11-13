@@ -1,8 +1,15 @@
 //! Ruststrap: a Rust port of Bloxstrap (https://github.com/bloxstraplabs/bloxstrap).
 //!
-//! Differences from the original: no WPF/WinForms UI (everything is CLI and log based), no Discord
-//! Rich Presence, no custom bootstrapper themes, no in-app updater. The launch/update/modification
-//! pipeline, FastFlags, activity tracking and the roblox:// protocol handlers are ported.
+//! The window UI (settings + launch progress) follows Bloxstrap's layout, drawn with egui in a Rust-orange
+//! theme. It is a GUI-subsystem program: no terminal opens on double-click or from a roblox:// link. When it
+//! is started from cmd/PowerShell with a subcommand, it borrows that console for the text output.
+//!
+//! Differences from the original: no Discord Rich Presence, no custom bootstrapper themes, no in-app updater.
+//! The launch/update/modification pipeline, FastFlags, activity tracking and the roblox:// protocol handlers
+//! are ported.
+
+// No console window. `console::attach_parent` gives the text subcommands their output back.
+#![windows_subsystem = "windows"]
 
 // Some ported helpers are kept for parity with Bloxstrap but not used yet.
 #![allow(dead_code)]
@@ -13,6 +20,7 @@ compile_error!("Ruststrap only supports Windows.");
 mod activity_watcher;
 mod app;
 mod bootstrapper;
+mod console;
 mod deployment;
 mod fast_flags;
 mod gpu;
@@ -20,9 +28,12 @@ mod installer;
 mod json_manager;
 mod launch_settings;
 mod logger;
+mod menu;
 mod models;
 mod paths;
+mod progress;
 mod registry;
+mod ui;
 mod watcher;
 
 use launch_settings::LaunchSettings;
@@ -40,7 +51,8 @@ USAGE
   {exe} roblox-player:...           what the browser passes; same as -player
   {exe} flags <list|get|set|remove|preset>   edit FastFlags
   {exe} gpu [list|set <high|saving|default>]   show GPUs, pick GPU for Roblox
-  {exe} -menu                       print where settings and logs live
+  {exe}                             open the settings window
+  {exe} -settings                   open the settings window
 
 OPTIONS
   -channel <name>   deployment channel (default production)
@@ -60,6 +72,7 @@ fn main() {
 }
 
 fn real_main() -> i32 {
+    console::attach_parent();
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     paths::init(paths::default_base());
@@ -79,6 +92,11 @@ fn real_main() -> i32 {
         _ => {}
     }
 
+    // double-click: no arguments, open the settings window
+    if args.is_empty() {
+        return ui::settings::run();
+    }
+
     app::set_launch(LaunchSettings::parse(args));
     let launch = app::launch();
 
@@ -96,12 +114,7 @@ fn real_main() -> i32 {
         return watcher::run();
     }
     if launch.active("menu") {
-        let p = paths::get();
-        println!("Settings : {}", p.base.join("Settings.json").display());
-        println!("FastFlags: {}", p.modifications.join("ClientSettings").join("ClientAppSettings.json").display());
-        println!("Mods     : {}", p.modifications.display());
-        println!("Logs     : {}", p.logs.display());
-        return 0;
+        return ui::settings::run();
     }
 
     let mode = launch.roblox_launch_mode;
@@ -109,5 +122,5 @@ fn real_main() -> i32 {
         print_help();
         return 0;
     }
-    bootstrapper::Bootstrapper::new(mode).run()
+    ui::launch::run(mode)
 }

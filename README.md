@@ -1,13 +1,14 @@
 # Ruststrap
 
-Pemasang dan peluncur Roblox untuk Windows, ditulis dengan Rust. Satu file `.exe`, tanpa .NET, tanpa jendela.
+Pemasang dan peluncur Roblox untuk Windows, ditulis dengan Rust. Satu file `.exe`, tanpa .NET, tanpa terminal.
+Ada jendela pengaturan dan jendela progres bertema oranye Rust, dengan tata letak mengikuti Bloxstrap.
 Repo: <https://github.com/nightbest001/Ruststarp>
 
 Ruststrap lahir dari [Bloxstrap](https://github.com/bloxstraplabs/bloxstrap) (C#, MIT). Alurnya dipindah ke
-Rust dan dibuat berbasis perintah (CLI), jadi bukan salinan Bloxstrap dan tidak berafiliasi dengannya.
+Rust, jadi bukan salinan Bloxstrap dan tidak berafiliasi dengannya.
 Bukan produk resmi Roblox.
 
-> **Status: awal (v0.1).** Kode belum pernah di-compile. Build sendiri dulu dan siap memperbaiki error kecil.
+> **Status: awal.** Jendela (GUI) baru ditambahkan dan belum pernah di-compile atau dijalankan. Build lewat GitHub Actions dulu, dan siap memperbaiki error kecil.
 
 ## Kenapa ada
 
@@ -15,13 +16,21 @@ Bukan produk resmi Roblox.
 |---|---|---|
 | Bahasa | C# (.NET 6, WPF) | Rust |
 | Kebutuhan | .NET Desktop Runtime | tidak ada |
-| Antarmuka | jendela dan tray | perintah di terminal |
-| Pengaturan | layar settings | file JSON dan perintah `flags` |
+| Antarmuka | jendela dan tray | jendela (egui), tanpa tray |
+| Pengaturan | layar settings | jendela pengaturan, atau file JSON dan perintah `flags` |
 | Discord Rich Presence | ada | belum |
 
 ## Cara pakai
 
-Unduh `ruststrap.exe` dari halaman Releases, lalu di terminal:
+Unduh `ruststrap.exe` dari halaman Releases lalu klik dua kali. Tidak ada terminal yang terbuka, yang muncul
+jendela **pengaturan**. Di situ ada halaman Integrations, Behaviour, Mods, FastFlags (dan editornya), GPU,
+Ruststrap (pasang, perbaiki, buka folder, hapus), dan About. Tombol **Save** menulis semua perubahan.
+
+Klik "Play" di situs Roblox (setelah Ruststrap dipasang) membuka **jendela progres** kecil: ikon, satu baris
+teks, bar, dan tombol Cancel. Jendela itu menutup sendiri begitu Roblox jalan.
+
+Perintah terminal tetap ada untuk yang butuh. Ruststrap meminjam konsol terminal yang memanggilnya, jadi
+tulisannya tetap tampil:
 
 ```
 ruststrap install                 pasang dan daftarkan link roblox://
@@ -63,12 +72,15 @@ file asli dikembalikan.
 | Versi Roblox | `%LOCALAPPDATA%\Ruststrap\Versions\` |
 | Log | `%LOCALAPPDATA%\Ruststrap\Logs\` |
 
-Isi `RUSTSTRAP_DEBUG=1` supaya baris log juga tampil di terminal.
+Isi `RUSTSTRAP_DEBUG=1` supaya baris log juga tampil di terminal (hanya kalau dijalankan dari terminal).
 
 ## Peta kode
 
 ```
-src/main.rs              pintu masuk dan subperintah
+src/main.rs              pintu masuk dan subperintah (tanpa jendela terminal)
+src/ui/                  jendela: pengaturan, progres, tema oranye, komponen
+src/progress.rs          status unduhan yang dibaca jendela progres
+src/console.rs           meminjam terminal pemanggil untuk subperintah
 src/bootstrapper.rs      cek versi, unduh, verifikasi MD5, ekstrak, mod, jalankan
 src/deployment.rs        balapan mirror CDN, channel, info versi
 src/launch_settings.rs   baca argumen dan URI roblox:
@@ -82,7 +94,7 @@ src/models.rs            Settings, State, manifest paket
 
 ## Yang belum ada
 
-Jendela pengaturan, Discord Rich Presence, tema bootstrapper, update otomatis, shortcut, preset mod
+Ikon di tray, Discord Rich Presence, tema bootstrapper, update otomatis, shortcut, preset mod
 (emoji, kursor, font), updater latar, dan pemasangan WebView2 otomatis.
 
 ## Build

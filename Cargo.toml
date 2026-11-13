@@ -13,6 +13,8 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 regex = "1"
 base64 = "0.22"
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts"] }
+rfd = { version = "0.18.0", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

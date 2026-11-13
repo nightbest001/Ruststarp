@@ -99,6 +99,7 @@ pub fn http() -> &'static reqwest::blocking::Client {
 
 /// Print to the console and the log.
 pub fn say(msg: &str) {
+    crate::progress::set_message(msg);
     println!("{msg}");
     crate::logger::write_line("App", msg);
 }

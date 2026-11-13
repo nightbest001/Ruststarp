@@ -217,6 +217,7 @@ impl Bootstrapper {
             Err(e) => {
                 crate::logger::write_exception("Bootstrapper::Run", &e);
                 eprintln!("error: {e}");
+                crate::progress::set_error(&e);
                 error_code::INSTALL_FAILURE
             }
         }
@@ -378,13 +379,21 @@ impl Bootstrapper {
 
         let total = self.manifest.len();
         for (i, pkg) in self.manifest.iter().enumerate() {
-            app::say(&format!("[{}/{}] {}", i + 1, total, pkg.name));
+            if crate::progress::cancelled() {
+                return Err("Cancelled.".into());
+            }
+            crate::progress::set_stage(i, total);
+            app::say(&format!("Downloading {} ({}/{})", pkg.name, i + 1, total));
             self.download_package(pkg)?;
+            crate::progress::set_stage_progress(0.8);
             if pkg.name == "WebView2RuntimeInstaller.zip" {
                 continue;
             }
+            app::say(&format!("Installing {} ({}/{})", pkg.name, i + 1, total));
             self.extract_package(pkg, &self.latest_dir, None)?;
+            crate::progress::set_stage_progress(1.0);
         }
+        crate::progress::set_stage(total, total);
 
         fs::write(self.latest_dir.join("AppSettings.xml"), APP_SETTINGS).map_err(|e| e.to_string())?;
 
@@ -477,13 +486,20 @@ impl Bootstrapper {
         let mut file = File::create(dest).map_err(|e| (e.to_string(), false))?;
         let mut hasher = Md5::new();
         let mut buf = vec![0u8; 65536];
+        let expected = resp.content_length().filter(|n| *n > 0).unwrap_or(pkg.packed_size.max(1));
+        let mut got: u64 = 0;
         loop {
+            if crate::progress::cancelled() {
+                return Err(("Cancelled.".to_string(), true));
+            }
             let n = resp.read(&mut buf).map_err(|e| (e.to_string(), false))?;
             if n == 0 {
                 break;
             }
             file.write_all(&buf[..n]).map_err(|e| (e.to_string(), false))?;
             hasher.update(&buf[..n]);
+            got += n as u64;
+            crate::progress::set_stage_progress(0.8 * (got as f32 / expected as f32).min(1.0));
         }
         let hash = format!("{:x}", hasher.finalize());
         if hash != pkg.signature {
@@ -612,6 +628,8 @@ impl Bootstrapper {
 
     fn start_roblox(&mut self) -> Result<(), String> {
         const IDENT: &str = "Bootstrapper::StartRoblox";
+        crate::progress::set_can_cancel(false);
+        crate::progress::set_indeterminate();
         let exe = self.app.exe_path();
         crate::gpu::apply_launch(&exe);
         let mut cmd = Command::new(&exe);
