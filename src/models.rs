@@ -42,6 +42,8 @@ pub struct Settings {
     pub use_fast_flag_manager: bool,
     pub enable_activity_tracking: bool,
     pub use_disable_app_patch: bool,
+    /// "default" | "saving" | "high"; see `gpu.rs`.
+    pub gpu_preference: String,
     pub debug_disable_version_package_cleanup: bool,
     pub custom_integrations: Vec<CustomIntegration>,
 }
@@ -54,6 +56,7 @@ impl Default for Settings {
             use_fast_flag_manager: true,
             enable_activity_tracking: true,
             use_disable_app_patch: false,
+            gpu_preference: "default".to_string(),
             debug_disable_version_package_cleanup: false,
             custom_integrations: Vec::new(),
         }

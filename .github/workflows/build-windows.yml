@@ -9,8 +9,10 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write # needed to create releases
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -27,7 +29,7 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: Ruststrap
           path: target/release/ruststrap.exe

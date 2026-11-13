@@ -613,6 +613,7 @@ impl Bootstrapper {
     fn start_roblox(&mut self) -> Result<(), String> {
         const IDENT: &str = "Bootstrapper::StartRoblox";
         let exe = self.app.exe_path();
+        crate::gpu::apply_launch(&exe);
         let mut cmd = Command::new(&exe);
         cmd.current_dir(self.app.directory());
         if !self.launch_cmd.is_empty() {

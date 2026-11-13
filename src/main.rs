@@ -4,6 +4,9 @@
 //! Rich Presence, no custom bootstrapper themes, no in-app updater. The launch/update/modification
 //! pipeline, FastFlags, activity tracking and the roblox:// protocol handlers are ported.
 
+// Some ported helpers are kept for parity with Bloxstrap but not used yet.
+#![allow(dead_code)]
+
 #[cfg(not(windows))]
 compile_error!("Ruststrap only supports Windows.");
 
@@ -12,6 +15,7 @@ mod app;
 mod bootstrapper;
 mod deployment;
 mod fast_flags;
+mod gpu;
 mod installer;
 mod json_manager;
 mod launch_settings;
@@ -35,6 +39,7 @@ USAGE
   {exe} -studio [file|uri]          launch (or update) Roblox Studio
   {exe} roblox-player:...           what the browser passes; same as -player
   {exe} flags <list|get|set|remove|preset>   edit FastFlags
+  {exe} gpu [list|set <high|saving|default>]   show GPUs, pick GPU for Roblox
   {exe} -menu                       print where settings and logs live
 
 OPTIONS
@@ -66,6 +71,7 @@ fn real_main() -> i32 {
     // plain-word subcommands
     match args.first().map(String::as_str) {
         Some("flags") => return fast_flags::cli(&args[1..]),
+        Some("gpu") => return gpu::cli(&args[1..]),
         Some("install") => return installer::install(args.iter().any(|a| a == "-quiet")),
         Some("uninstall") => {
             return installer::uninstall(args.iter().any(|a| a == "-quiet"), args.iter().any(|a| a == "-keepdata"));

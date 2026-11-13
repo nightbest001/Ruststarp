@@ -3,7 +3,6 @@ name = "ruststrap"
 version = "0.1.0"
 edition = "2021"
 description = "Ruststrap: a Rust port of Bloxstrap, an alternative Roblox bootstrapper"
-license = "MIT"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

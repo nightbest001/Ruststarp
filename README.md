@@ -1,49 +1,89 @@
-<p align="center"><img src="assets/Ruststrap-full-dark.png" width="360" alt="Ruststrap"></p>
-
 # Ruststrap
 
-Repo: https://github.com/nightbest001/Ruststarp
+Pemasang dan peluncur Roblox untuk Windows, ditulis dengan Rust. Satu file `.exe`, tanpa .NET, tanpa jendela.
+Repo: <https://github.com/nightbest001/Ruststarp>
 
-Ruststrap is a Rust port of [Bloxstrap](https://github.com/bloxstraplabs/bloxstrap), an alternative bootstrapper
-for the Roblox game client. It downloads and updates Roblox, lets you modify its files, and sets FastFlags.
+Ruststrap lahir dari [Bloxstrap](https://github.com/bloxstraplabs/bloxstrap) (C#, MIT). Alurnya dipindah ke
+Rust dan dibuat berbasis perintah (CLI), jadi bukan salinan Bloxstrap dan tidak berafiliasi dengannya.
+Bukan produk resmi Roblox.
 
-> **Status:** early port. It has not been compiled or tested yet (the machine that wrote it had no Rust
-> toolchain). Run `cargo build --release` on Windows and expect to fix a few compile errors.
+> **Status: awal (v0.1).** Kode belum pernah di-compile. Build sendiri dulu dan siap memperbaiki error kecil.
 
-## What is ported
+## Kenapa ada
 
-| Bloxstrap | Ruststrap |
-|---|---|
-| `Bootstrapper.cs` (install, update, package download, MD5 check, extract, launch) | `src/bootstrapper.rs` |
-| `RobloxInterfaces/Deployment.cs` (mirror race, channels) | `src/deployment.rs` |
-| `LaunchSettings.cs` (`-player`, `-studio`, `roblox:` URIs) | `src/launch_settings.rs` |
-| `Settings/State/DistributionState`, `JsonManager.cs` | `src/models.rs`, `src/json_manager.rs` |
-| `FastFlagManager.cs` | `src/fast_flags.rs` (`ruststrap flags ...`) |
-| `Modifications` folder handling | `Bootstrapper::apply_modifications` |
-| `Installer.cs`, `WindowsRegistry.cs` | `src/installer.rs`, `src/registry.rs` |
-| `Watcher.cs`, `ActivityWatcher.cs` | `src/watcher.rs`, `src/activity_watcher.rs` |
-| `Paths.cs`, `Logger.cs` | `src/paths.rs`, `src/logger.rs` |
+| | Bloxstrap | Ruststrap |
+|---|---|---|
+| Bahasa | C# (.NET 6, WPF) | Rust |
+| Kebutuhan | .NET Desktop Runtime | tidak ada |
+| Antarmuka | jendela dan tray | perintah di terminal |
+| Pengaturan | layar settings | file JSON dan perintah `flags` |
+| Discord Rich Presence | ada | belum |
 
-## Not ported (yet)
+## Cara pakai
 
-- The WPF/WinForms interface (bootstrapper dialogs, settings window, tray icon). Ruststrap is CLI + log based.
-- Discord Rich Presence, custom bootstrapper themes, in-app self-update, emoji/cursor/font mod presets,
-  shortcuts, locale files, background updater, WebView2 auto-install.
-
-## Usage
+Unduh `ruststrap.exe` dari halaman Releases, lalu di terminal:
 
 ```
-ruststrap install              copy to %LOCALAPPDATA%\Ruststrap, register roblox:// links
-ruststrap -player              launch Roblox (updates first)
-ruststrap -studio              launch Roblox Studio
-ruststrap -player -nolaunch    update only
+ruststrap install                 pasang dan daftarkan link roblox://
+ruststrap -player                 update lalu jalankan Roblox
+ruststrap -player -nolaunch       update saja
+ruststrap -studio                 jalankan Roblox Studio
+ruststrap -player -channel <nama> pakai channel tertentu
+ruststrap -player -force          pasang ulang
+ruststrap uninstall               hapus semuanya
+```
+
+Setelah `install`, klik "Play" di situs Roblox akan membuka game lewat Ruststrap.
+
+### FastFlags
+
+```
+ruststrap flags list
 ruststrap flags set DFIntTaskSchedulerTargetFps 144
+ruststrap flags remove DFIntTaskSchedulerTargetFps
 ruststrap flags preset msaa 4
-ruststrap uninstall
+ruststrap flags preset texture 1
+ruststrap flags preset disable-scaling on
 ```
 
-Data lives in `%LOCALAPPDATA%\Ruststrap` (`Settings.json`, `Modifications\`, `Versions\`, `Logs\`).
-Set `RUSTSTRAP_DEBUG=1` to also print log lines to the console.
+Flag dipakai saat Roblox dijalankan lewat Ruststrap berikutnya.
+
+### Modifikasi file
+
+Taruh file di `%LOCALAPPDATA%\Ruststrap\Modifications\`, dengan susunan folder yang sama seperti folder Roblox
+(contoh: `content\sounds\ouch.ogg`). File akan disalin ke versi Roblox saat peluncuran. Kalau kamu hapus file itu,
+file asli dikembalikan.
+
+### Lokasi data
+
+| Apa | Di mana |
+|---|---|
+| Pengaturan | `%LOCALAPPDATA%\Ruststrap\Settings.json` |
+| Modifikasi dan FastFlags | `%LOCALAPPDATA%\Ruststrap\Modifications\` |
+| Versi Roblox | `%LOCALAPPDATA%\Ruststrap\Versions\` |
+| Log | `%LOCALAPPDATA%\Ruststrap\Logs\` |
+
+Isi `RUSTSTRAP_DEBUG=1` supaya baris log juga tampil di terminal.
+
+## Peta kode
+
+```
+src/main.rs              pintu masuk dan subperintah
+src/bootstrapper.rs      cek versi, unduh, verifikasi MD5, ekstrak, mod, jalankan
+src/deployment.rs        balapan mirror CDN, channel, info versi
+src/launch_settings.rs   baca argumen dan URI roblox:
+src/fast_flags.rs        FastFlags dan preset
+src/installer.rs         pasang dan hapus
+src/registry.rs          protokol roblox:// dan entri uninstall
+src/watcher.rs           proses latar yang menunggu Roblox tutup
+src/activity_watcher.rs  baca log Roblox: masuk dan keluar game
+src/models.rs            Settings, State, manifest paket
+```
+
+## Yang belum ada
+
+Jendela pengaturan, Discord Rich Presence, tema bootstrapper, update otomatis, shortcut, preset mod
+(emoji, kursor, font), updater latar, dan pemasangan WebView2 otomatis.
 
 ## Build
 
@@ -51,4 +91,17 @@ Set `RUSTSTRAP_DEBUG=1` to also print log lines to the console.
 cargo build --release
 ```
 
-Windows only. License: MIT (same as Bloxstrap). Original work by pizzaboxer and the Bloxstrap contributors.
+Hasil: `target\release\ruststrap.exe`. Hanya untuk Windows. Tag `vX.Y.Z` memicu build dan rilis otomatis lewat GitHub Actions.
+
+## GPU
+
+Ruststrap baca GPU dari registry dan bisa paksa Roblox pakai GPU cepat (berguna di laptop dengan dua GPU).
+
+```
+ruststrap gpu                 # daftar GPU + pilihan sekarang
+ruststrap gpu set high        # Roblox pakai GPU performa tinggi
+ruststrap gpu set saving      # Roblox pakai GPU hemat daya
+ruststrap gpu set default     # lepas, biar Windows yang pilih
+```
+
+Pilihan ditulis ke `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` untuk `RobloxPlayerBeta.exe` dan `RobloxStudioBeta.exe`, dan ditulis ulang tiap Roblox dijalankan (folder versi baru tiap update). Jenis GPU (discrete/integrated) hasil tebakan dari nama dan VRAM.
