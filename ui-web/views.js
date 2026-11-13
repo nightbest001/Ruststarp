@@ -149,7 +149,6 @@ function Settings(prev){
       const avatar=a=>a.avatar?h('img',{class:'av',src:a.avatar,alt:'',referrerpolicy:'no-referrer'}):h('div',{class:'av ph'},(a.display_name||a.username||'?').slice(0,1).toUpperCase());
       async function launch(a){
         if(dirty()&&!(await save()))return;
-        if(!S.place.trim()){snack({title:t('X.Error'),msg:t('X.Acc.NeedPlace'),kind:'bad',timeout:5000});return}
         try{await call('account_launch',{user_id:a.user_id,place:S.place,job:S.job});
           snack({title:t('X.Acc.Launching',a.display_name||a.username),kind:'ok',icon:'CheckmarkCircle32'})}
         catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:7000})}}

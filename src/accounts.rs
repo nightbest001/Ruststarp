@@ -272,6 +272,15 @@ fn launch_uri(ticket: &str, place: u64, job: &str) -> String {
     )
 }
 
+/// Opens the Roblox app (home screen) as the signed-in account, with no game.
+fn launch_app_uri(ticket: &str) -> String {
+    let tracker = 100_000_000_000u64 + rand_u64(3) % 900_000_000_000u64;
+    let now = chrono::Utc::now().timestamp_millis();
+    format!(
+        "roblox-player:1+launchmode:app+gameinfo:{ticket}+launchtime:{now}+browsertrackerid:{tracker}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp"
+    )
+}
+
 // ------------------------------------------------------------------ public API
 
 fn to_json(a: &Account) -> Value {
@@ -438,11 +447,16 @@ pub fn parse_place(input: &str) -> Option<u64> {
     digits.parse().ok().filter(|n| *n > 0)
 }
 
-/// Starts Roblox as `user_id` in `place`. The window and updates come from the normal launch path.
+/// Starts Roblox as `user_id`. An empty `place` opens the Roblox app without a game.
+/// The window and updates come from the normal launch path.
 pub fn launch(user_id: u64, place: &str, job: &str) -> Result<(), String> {
-    let place_id = parse_place(place).ok_or_else(|| {
-        pick("Type a Place ID or paste a game link (roblox.com/games/...).", "Isi Place ID atau tempel link game (roblox.com/games/...).")
-    })?;
+    let place_id = if place.trim().is_empty() {
+        None
+    } else {
+        Some(parse_place(place).ok_or_else(|| {
+            pick("That Place ID or game link looks wrong.", "Place ID atau link game sepertinya salah.")
+        })?)
+    };
     let job = job.trim();
     if !job.is_empty() && !job.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
         return Err(pick("The server ID looks wrong.", "Server ID sepertinya salah."));
@@ -451,7 +465,10 @@ pub fn launch(user_id: u64, place: &str, job: &str) -> Result<(), String> {
         .ok_or_else(|| pick("That account is gone.", "Akun itu sudah tidak ada."))?;
     let cookie = unprotect(&enc)?;
     let ticket = auth_ticket(&cookie)?;
-    let uri = launch_uri(&ticket, place_id, job);
+    let uri = match place_id {
+        Some(id) => launch_uri(&ticket, id, job),
+        None => launch_app_uri(&ticket),
+    };
     Command::new(paths::process()).arg(uri).spawn().map_err(|e| e.to_string())?;
     with(|l| {
         if let Some(a) = l.iter_mut().find(|a| a.user_id == user_id) {
