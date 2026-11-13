@@ -1,20 +1,48 @@
 //! Port of `Installer.cs` (install = copy the exe + register protocols; uninstall = reverse it).
 
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
 use crate::app::{self, error_code, PROJECT_NAME};
-use crate::{paths, registry};
+use crate::{paths, registry, shortcuts};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+/// True when a terminal is attached (`ruststrap uninstall` typed in cmd). Apps & Features starts the exe without one.
+fn has_console() -> bool {
+    io::stdin().is_terminal()
+}
+
 fn confirm(question: &str) -> bool {
-    print!("{question} [y/N] ");
-    let _ = io::stdout().flush();
-    let mut s = String::new();
-    io::stdin().read_line(&mut s).is_ok() && matches!(s.trim().to_lowercase().as_str(), "y" | "yes")
+    if has_console() {
+        print!("{question} [y/N] ");
+        let _ = io::stdout().flush();
+        let mut s = String::new();
+        io::stdin().read_line(&mut s).is_ok() && matches!(s.trim().to_lowercase().as_str(), "y" | "yes")
+    } else {
+        rfd::MessageDialog::new()
+            .set_title(PROJECT_NAME)
+            .set_description(question)
+            .set_level(rfd::MessageLevel::Warning)
+            .set_buttons(rfd::MessageButtons::YesNo)
+            .show()
+            == rfd::MessageDialogResult::Yes
+    }
+}
+
+fn notify(msg: &str) {
+    if has_console() {
+        println!("{msg}");
+    } else {
+        let _ = rfd::MessageDialog::new()
+            .set_title(PROJECT_NAME)
+            .set_description(msg)
+            .set_level(rfd::MessageLevel::Info)
+            .set_buttons(rfd::MessageButtons::Ok)
+            .show();
+    }
 }
 
 pub fn install(quiet: bool) -> i32 {
@@ -62,6 +90,8 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
         let _ = Command::new("taskkill").args(["/F", "/IM", exe]).creation_flags(CREATE_NO_WINDOW).output();
     }
 
+    let _ = shortcuts::apply(&[false; 5]);
+
     let (player_left, studio_left) = registry::restore_official_handlers();
     crate::log!(IDENT, "Official player left: {player_left}, studio left: {studio_left}");
 
@@ -86,7 +116,8 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
     // the running exe cannot delete itself: let cmd.exe do it after we exit
     let robloxless = !player_left && !studio_left;
     let base = p.base.to_string_lossy().to_string();
-    let mut tail = format!("rmdir /s /q \"{base}\"");
+    // WebView2 keeps files in the folder for a moment after exit, so try twice
+    let mut tail = format!("rmdir /s /q \"{base}\" & ping 127.0.0.1 -n 4 >nul & rmdir /s /q \"{base}\"");
     if robloxless {
         tail.push_str(&format!(" & rmdir /s /q \"{}\"", paths::local_app_data().join("Roblox").display()));
     }
@@ -96,7 +127,20 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
         .spawn();
 
     if !quiet {
-        println!("{PROJECT_NAME} has been uninstalled.");
+        notify(&format!("{PROJECT_NAME} has been uninstalled."));
     }
     error_code::SUCCESS
+}
+
+/// After a self-update (or a manual exe swap) the registry still names the old version: bring it up to date.
+pub fn refresh_registration() {
+    if !paths::running_installed_copy() || registry::installed_version().as_deref() == Some(app::VERSION) {
+        return;
+    }
+    let p = paths::get();
+    let app_path = p.application.to_string_lossy().to_string();
+    let base = p.base.to_string_lossy().to_string();
+    if let Err(e) = registry::write_uninstall_entry(&app_path, &base).and_then(|_| registry::register_all(&app_path)) {
+        crate::log!("Installer::Refresh", "Could not refresh the registry: {e}");
+    }
 }

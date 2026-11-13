@@ -261,3 +261,9 @@ a.lnk:hover{text-decoration:underline}
 .wizard{display:grid;grid-template-columns:200px 1fr;flex:1;margin:12px 0 0 12px;min-height:0}
 .wizard .nav-item{pointer-events:none}.wizard .nav-item.done .i{color:var(--accent)}
 .tag{display:inline-block;padding:1px 8px;border-radius:10px;background:var(--sub);font-size:12px;color:var(--tx2)}
+
+/* ---- update banner ---- */
+.upd{display:flex;align-items:center;gap:12px;flex:none;margin:0 12px 8px;padding:10px 16px;border:1px solid var(--stroke);border-radius:4px;background:var(--card);position:relative;animation:dlgIn .25s cubic-bezier(.1,.9,.2,1)}
+.upd::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:2px;background:var(--accent)}
+.upd .ui{font-size:20px;color:var(--accent);flex:none}
+.upd .ut{flex:1;min-width:0}.upd .tt{font-weight:600}.upd .ds{color:var(--tx2);font-size:12px;margin-top:2px}

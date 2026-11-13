@@ -4,7 +4,8 @@
 //! window, so layout, icons and animation match Bloxstrap's WPF-UI. It is a GUI-subsystem program: no terminal opens on double-click or from a roblox:// link. When it
 //! is started from cmd/PowerShell with a subcommand, it borrows that console for the text output.
 //!
-//! Differences from the original: no Discord Rich Presence (removed), no bootstrapper styles / languages, no in-app updater.
+//! Differences from the original: no Discord Rich Presence (removed), no bootstrapper styles / languages.
+//! Ruststrap updates itself from GitHub Releases (`updater.rs`): the window shows a banner when a newer version exists.
 //! The launch/update/modification pipeline, FastFlags, activity tracking and the roblox:// protocol handlers
 //! are ported.
 
@@ -36,6 +37,7 @@ mod diagnostics;
 mod registry;
 mod shortcuts;
 mod ui;
+mod updater;
 mod watcher;
 
 use launch_settings::LaunchSettings;
@@ -53,6 +55,7 @@ USAGE
   {exe} roblox-player:...           what the browser passes; same as -player
   {exe} flags <list|get|set|remove|preset>   edit FastFlags
   {exe} gpu [list|set <high|saving|default>]   show GPUs, pick GPU for Roblox
+  {exe} update                      look for a newer {name} on GitHub and install it
   {exe}                             open the settings window
   {exe} -settings                   open the settings window
 
@@ -83,10 +86,18 @@ fn real_main() -> i32 {
     crate::log!("App::Main", "Ruststrap {} starting", app::VERSION);
     app::load_all();
 
+    // leftovers of a self-update, and a registry entry that still names the old version
+    let uninstalling = args.iter().any(|a| matches!(a.as_str(), "uninstall" | "-uninstall"));
+    if !uninstalling && !is_watcher {
+        updater::cleanup_leftovers();
+        installer::refresh_registration();
+    }
+
     // plain-word subcommands
     match args.first().map(String::as_str) {
         Some("flags") => return fast_flags::cli(&args[1..]),
         Some("gpu") => return gpu::cli(&args[1..]),
+        Some("update") => return updater::cli(),
         Some("install") => {
             let code = installer::install(args.iter().any(|a| a == "-quiet"));
             if code == app::error_code::SUCCESS {

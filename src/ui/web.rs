@@ -24,7 +24,7 @@ use wry::{NewWindowResponse, WebContext, WebViewBuilder, WebViewBuilderExtWindow
 use crate::app::{self, error_code, PROJECT_DOWNLOAD_LINK, PROJECT_HELP_LINK, PROJECT_NAME, PROJECT_SUPPORT_LINK};
 use crate::bootstrapper::Bootstrapper;
 use crate::models::{CustomIntegration, FastFlags, LaunchMode, Settings};
-use crate::{fast_flags, gpu, installer, paths, progress, registry, shortcuts};
+use crate::{fast_flags, gpu, installer, paths, progress, registry, shortcuts, updater};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const HTML: &str = include_str!("../../ui-web/dist/index.html");
@@ -63,6 +63,8 @@ enum UserEvent {
     Close,
     /// Window X pressed without the page's say-so.
     CloseRequest,
+    /// The update banner appeared (true) or went away (false): the launch menu grows to make room.
+    Banner(bool),
 }
 
 static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
@@ -197,6 +199,7 @@ fn init_json(mode: Mode) -> Value {
         "name": PROJECT_NAME,
         "version": app::VERSION,
         "installed": installed,
+        "can_update": matches!(mode, Mode::Home | Mode::Settings) && paths::running_installed_copy(),
         "already_running": false,
         "settings": settings_to_json(&settings),
         "force_reinstall": app::state().prop.force_reinstall,
@@ -358,11 +361,36 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
             }
         }
         "uninstall" => {
-            if installer::uninstall(true, false) == error_code::SUCCESS {
+            if installer::uninstall(true, arg_bool(a, "keep_data")) == error_code::SUCCESS {
                 Ok(Value::Null)
             } else {
                 Err("Uninstall failed, see the log".into())
             }
+        }
+        "check_update" => match updater::check() {
+            Ok(Some(i)) => Ok(json!({"available": true, "version": i.version, "current": app::VERSION, "size": i.size})),
+            Ok(None) => Ok(json!({"available": false, "current": app::VERSION})),
+            Err(e) => Err(e),
+        },
+        "start_update" => {
+            // the same window comes back after the swap: settings reopens as settings, the menu as the menu
+            let reopen = if mode == Mode::Settings { Some("-menu") } else { None };
+            let p = proxy.clone();
+            updater::start(move |ok| {
+                if ok {
+                    let mut c = Command::new(&paths::get().application);
+                    if let Some(arg) = reopen {
+                        c.arg(arg);
+                    }
+                    let _ = c.spawn();
+                    let _ = p.send_event(UserEvent::Close);
+                }
+            })?;
+            Ok(Value::Null)
+        }
+        "update_progress" => {
+            let p = updater::progress();
+            Ok(json!({"phase": updater::phase_name(p.phase), "done": p.done, "total": p.total, "error": p.error}))
         }
         "launch" => {
             let arg = arg_str(a, "arg");
@@ -410,6 +438,7 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
                 "min" => UserEvent::Min,
                 "max" => UserEvent::Max,
                 "drag" => UserEvent::Drag,
+                "banner" => UserEvent::Banner(arg_bool(a, "on")),
                 "close" if arg_bool(a, "force") || !mode.asks_before_close() => UserEvent::Close,
                 "close" => UserEvent::CloseRequest,
                 "resize" => UserEvent::Resize(match arg_str(a, "dir") {
@@ -547,6 +576,11 @@ pub fn run(mode: Mode) -> i32 {
                 }
                 UserEvent::CloseRequest => {
                     let _ = webview.evaluate_script("window.__tryClose&&window.__tryClose()");
+                }
+                UserEvent::Banner(on) => {
+                    if mode == Mode::Home {
+                        window.set_inner_size(LogicalSize::new(w, if on { h + 56.0 } else { h }));
+                    }
                 }
             },
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {

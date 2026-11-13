@@ -151,6 +151,11 @@ pub fn write_uninstall_entry(app_path: &str, base: &str) -> io::Result<()> {
     Ok(())
 }
 
+/// Version written to the uninstall entry by the last install or update.
+pub fn installed_version() -> Option<String> {
+    hkcu().open_subkey(UNINSTALL_KEY).ok()?.get_value::<String, _>("DisplayVersion").ok()
+}
+
 pub fn delete_uninstall_entry() {
     let _ = hkcu().delete_subkey_all(UNINSTALL_KEY);
 }

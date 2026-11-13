@@ -6,6 +6,53 @@ const F={MSAA:'FIntDebugForceMSAASamples',TEXON:'DFFlagTextureQualityOverrideEna
 const PRESET_FLAGS=Object.values(F);
 const wrap=(win,...kids)=>{win.append(...kids);return win};
 
+/* =========================================================== UPDATE BANNER */
+const mb=n=>n?(n/1048576).toFixed(1)+' MB':'';
+function UpdateBar(o){
+  o=o||{};
+  const el=h('div',{class:'upd'});el.style.display='none';
+  const S={busy:false};
+  const title=h('div',{class:'tt'});const sub=h('div',{class:'ds'});
+  const pbv=h('div',{class:'v'});const pb=h('div',{class:'pb',style:{display:'none',marginTop:'8px'}},pbv);
+  const go=Btn('',{kind:'primary',icon:'ArrowDownload16',onclick:()=>run()});
+  const later=Btn('Later',{onclick:()=>hide()});
+  const label=txt=>{go.querySelector('span').textContent=txt};
+  const show=()=>{el.style.display='';if(D.mode==='home')call('win',{op:'banner',on:true})};
+  function hide(){el.style.display='none';if(D.mode==='home')call('win',{op:'banner',on:false})}
+  function fail(e){S.busy=false;go.disabled=false;go.classList.remove('dis');later.style.display='';
+    pb.classList.remove('ind');pb.classList.add('err');pbv.style.width='100%';
+    title.textContent='Update failed';sub.textContent=String(e||'Unknown error');label('Try again')}
+  async function run(){
+    if(S.busy)return;
+    if(o.beforeRun&&!(await o.beforeRun()))return;
+    S.busy=true;go.disabled=true;go.classList.add('dis');later.style.display='none';
+    pb.style.display='';pb.classList.remove('err');pb.classList.add('ind');
+    title.textContent='Updating '+NAME;sub.textContent='Starting...';
+    try{await call('start_update')}catch(e){return fail(e)}
+    poll()}
+  async function poll(){
+    let p;try{p=await call('update_progress')}catch(e){return fail(e)}
+    if(!p)return setTimeout(poll,150);
+    if(p.phase==='failed')return fail(p.error);
+    if(p.phase==='downloading'){
+      if(p.total){pb.classList.remove('ind');pbv.style.width=Math.min(100,p.done*100/p.total)+'%'}
+      sub.textContent='Downloading '+mb(p.done)+(p.total?' of '+mb(p.total):'')}
+    else{pb.classList.add('ind');sub.textContent=p.phase==='done'?'Restarting...':'Installing...'}
+    setTimeout(poll,150)}
+  /* manual=true: tell the user when there is nothing new or the check failed */
+  el.check=async function(manual){
+    try{
+      const r=await call('check_update');
+      if(r&&r.available){
+        title.textContent='Update available: version '+r.version;
+        sub.textContent='You have '+r.current+(r.size?' ('+mb(r.size)+')':'')+'. The update installs right here, no browser download needed.';
+        label('Update to '+r.version);show();return true}
+      if(manual)snack({title:'You are up to date',msg:NAME+' '+D.version+' is the newest version.',kind:'ok',icon:'CheckmarkCircle32'});
+    }catch(e){if(manual)snack({title:'Could not check for updates',msg:String(e),kind:'bad',timeout:6000})}
+    return false};
+  el.append(icon('ArrowDownload16','ui'),h('div',{class:'ut'},title,sub,pb),go,later);
+  return el}
+
 /* =========================================================== SETTINGS */
 function Settings(){
   const S={s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null};
@@ -14,6 +61,7 @@ function Settings(){
   let page='integrations';let crumbs=[];
   const win=h('div',{class:'win'});
   window.__themeMode=S.s.theme;applyTheme(S.s.theme);
+  const upd=UpdateBar({beforeRun:async()=>!dirty()||await confirmBox(t('Common.Warning'),t('Menu.UnsavedChanges'))});
 
   const NAV=[
     ['integrations','Menu.Integrations.Title','Add28'],['behaviour','Menu.Behaviour.Title','PlaySettings20'],['mods','Menu.Mods.Title','WrenchScrewdriver20'],
@@ -167,12 +215,18 @@ function Settings(){
       return pg(h('div',{class:'desc'},t('Menu.Bloxstrap.Description')),
         Option({header:D.installed?'Repair installation':'Install '+NAME,desc:'Copies '+NAME+' to your user folder and makes roblox:// links open through it.',content:Btn(D.installed?'Repair':t('Common.Navigation.Install'),{kind:'primary',onclick:async()=>{try{await call('install');D.installed=true;snack({title:NAME+' installed',kind:'ok',icon:'CheckmarkCircle32'});go('ruststrap')}catch(e){snack({title:'Install failed',msg:String(e),kind:'bad',timeout:6000})}}})}),
         Option({header:t('Menu.Behaviour.AutoUpdate.Title'),desc:t('Menu.Behaviour.AutoUpdate.Description'),content:Toggle(()=>S.s.check_for_updates,v=>S.s.check_for_updates=v)}),
+        Option({header:'Check for updates now',desc:'You have version '+D.version+'. Looks on GitHub for a newer release.'+(D.can_update?'':' Open the installed copy of '+NAME+' to update it.'),content:Btn('Check now',{icon:'ArrowDownload16',enabled:()=>D.can_update,onclick:()=>upd.check(true)})}),
         Option({header:'Data folder',desc:D.paths.base,content:Btn('Open',{icon:'Folder24',onclick:()=>call('open_folder',{which:'base'})})}),
         Option({header:'Logs',desc:D.paths.logs,content:Btn(t('Common.OpenLogFile').replace(/ file$/,''),{icon:'Folder24',onclick:()=>call('open_folder',{which:'logs'})})}),
         Card(h('div',{style:{display:'flex',alignItems:'center',gap:'16px'}},h('div',{style:{flex:1}},h('div',null,t('Menu.Bloxstrap.ExportData.Title')),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px'}},t('Menu.Bloxstrap.ExportData.Description')),
           h('div',{style:{display:'flex',gap:'24px',marginTop:'12px'}},Check(t('Menu.Bloxstrap.ExportData.ExportConfig'),()=>ec.v,v=>ec.v=v),Check(t('Menu.Bloxstrap.ExportData.ExportLogs'),()=>el.v,v=>el.v=v))),
           Btn(t('Common.Export'),{icon:'CopySelect20',cls:'',enabled:()=>ec.v||el.v,onclick:async()=>{try{const r=await call('export_diag',{config:ec.v,logs:el.v});if(r)snack({title:'Diagnostic data exported',kind:'ok',icon:'CheckmarkCircle32'})}catch(e){snack({title:'Export failed',msg:String(e),kind:'bad',timeout:6000})}}}))),
-        Option({header:'Uninstall',desc:'Removes '+NAME+' and the Roblox it installed.',content:Btn('Uninstall',{kind:'danger',icon:'Delete28',onclick:async()=>{if(await confirmBox('Uninstall '+NAME+'?','Ruststrap and the Roblox it installed will be removed.','Uninstall',t('Common.Cancel'))){try{await call('uninstall');call('win',{op:'close',force:true})}catch(e){snack({title:'Uninstall failed',msg:String(e),kind:'bad'})}}}})}))},
+        Option({header:'Uninstall',desc:'Removes '+NAME+', its shortcuts and the Roblox it installed. You can also do this from Windows Settings > Apps.',content:Btn('Uninstall',{kind:'danger',icon:'Delete28',enabled:()=>D.installed,onclick:async()=>{
+          const keep={v:false};
+          const body=h('div',null,h('div',null,NAME+' and the Roblox it installed will be removed.'),h('div',{style:{marginTop:'12px'}},Check(t('Uninstaller.KeepData.Label'),()=>keep.v,v=>keep.v=v)),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'4px'}},t('Uninstaller.KeepData.Description')));
+          if(await confirmBox('Uninstall '+NAME+'?',body,t('Uninstaller.Uninstall'),t('Common.Cancel'))){
+            try{await call('uninstall',{keep_data:keep.v});await dialog({title:'Uninstalled',body:NAME+' has been removed.'});call('win',{op:'close',force:true})}
+            catch(e){snack({title:'Uninstall failed',msg:String(e),kind:'bad',timeout:6000})}}}})}))},
 
     about(){return AboutBody()}
   };
@@ -199,10 +253,11 @@ function Settings(){
 
   const mainEl=h('div',{class:'main'},crumb,pageWrap);
   const rootEl=h('div',{class:'root'},navEl,mainEl);
-  wrap(win,TitleBar({title:t('Menu.Title'),min:true,max:true,onclose:()=>closeWin()}),rootEl,status,ResizeHandles());
+  wrap(win,TitleBar({title:t('Menu.Title'),min:true,max:true,onclose:()=>closeWin()}),upd,rootEl,status,ResizeHandles());
   const dirtyLabel=status.querySelector('.l');
   onTouch(()=>{const d=dirty();saveBtn.disabled=false;dirtyLabel.textContent=D.installed?'':'Not installed yet: open the '+NAME+' page and press Install.'});
   root.append(win);go('integrations');
+  if(D.can_update&&D.settings.check_for_updates)upd.check(false);
   if(D.already_running)snack({title:t('Menu.AlreadyRunning.Title'),msg:t('Menu.AlreadyRunning.Caption'),icon:'Info20',timeout:10000});
 }
 
@@ -273,7 +328,9 @@ function Home(){
     CardAction({icon:'Settings28',title:t('LaunchMenu.ConfigureSettings'),onclick:()=>go('-settings')}),
     h('div',{style:{height:'16px'}}),
     CardAction({icon:'BookQuestionMark24',title:t('LaunchMenu.Wiki.Title'),desc:t('LaunchMenu.Wiki.Description'),onclick:()=>openUrl(WIKI+'/help/')}));
-  wrap(win,TitleBar({title:NAME}),h('div',{style:{display:'grid',gridTemplateColumns:'280px 1fr',flex:1,minHeight:0}},left,right));root.append(win);document.title=NAME}
+  const upd=UpdateBar();
+  wrap(win,TitleBar({title:NAME}),upd,h('div',{style:{display:'grid',gridTemplateColumns:'280px 1fr',flex:1,minHeight:0}},left,right));root.append(win);document.title=NAME;
+  if(D.can_update&&D.settings.check_for_updates)upd.check(false)}
 
 /* =========================================================== SETUP (installer) */
 function Setup(){

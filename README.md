@@ -23,6 +23,8 @@ Bukan produk resmi Roblox.
 | Setup awal (Welcome, Install, Completion) | ada | ada |
 | Halaman Appearance | tema, bootstrapper, ikon | tema (sistem/terang/gelap) dan judul bootstrapper |
 | Export diagnostic data | ada | ada |
+| Update diri sendiri | ada | ada: banner di dalam app, tanpa unduh lewat browser |
+| Uninstall | Apps & Features dan tombol di app | sama: Apps & Features, tombol di app, atau `ruststrap uninstall` |
 
 ## Cara pakai
 
@@ -43,10 +45,34 @@ ruststrap -player -nolaunch       update saja
 ruststrap -studio                 jalankan Roblox Studio
 ruststrap -player -channel <nama> pakai channel tertentu
 ruststrap -player -force          pasang ulang
+ruststrap update                  cek GitHub dan pasang versi baru
 ruststrap uninstall               hapus semuanya
 ```
 
 Setelah `install`, klik "Play" di situs Roblox akan membuka game lewat Ruststrap.
+
+### Update
+
+Saat jendela Ruststrap dibuka (menu utama atau pengaturan), Ruststrap cek rilis terbaru di
+<https://github.com/nightbest001/Ruststarp/releases>. Kalau ada versi lebih baru, muncul banner
+**Update available: version X** dengan tombol **Update to X**. Klik tombol itu: file diunduh dengan bar progres,
+diperiksa (ukuran, header program, dan checksum SHA-256 kalau GitHub menyediakannya), lalu menggantikan
+`Ruststrap.exe` yang terpasang dan app dibuka ulang. Tidak perlu unduh lewat browser.
+
+- Matikan cek otomatis: halaman **Ruststrap** di pengaturan, opsi *Check for Ruststrap updates*. Tombol **Check now** di halaman yang sama tetap bisa dipakai.
+- Cek dan pasang dari terminal: `ruststrap update`.
+- Hanya salinan yang terpasang yang bisa update. File `.exe` yang baru diunduh dan belum dipasang menampilkan setup wizard.
+- Untuk merilis: buat tag `vX.Y.Z`. Workflow membangun dan melampirkan `ruststrap.exe` ke rilis, dan nama file itu yang dicari updater.
+- File lama diganti nama jadi `Ruststrap.exe.old` lalu dihapus di start berikutnya.
+
+### Uninstall
+
+Tiga cara, hasilnya sama (hapus Ruststrap, shortcut, entri registry, dan Roblox yang dipasangnya, lalu kembalikan link
+`roblox://` ke Roblox resmi kalau masih ada):
+
+1. **Pengaturan Windows > Apps > Ruststrap > Uninstall**. Muncul dialog konfirmasi, tanpa terminal.
+2. Di Ruststrap: halaman **Ruststrap** > **Uninstall**. Ada pilihan *Keep my settings and mods*.
+3. Terminal: `ruststrap uninstall` (tambah `-quiet` supaya tanpa tanya, `-keepdata` untuk menyimpan pengaturan dan mod).
 
 ### FastFlags
 
@@ -90,6 +116,7 @@ src/deployment.rs        balapan mirror CDN, channel, info versi
 src/launch_settings.rs   baca argumen dan URI roblox:
 src/fast_flags.rs        FastFlags dan preset
 src/installer.rs         pasang dan hapus
+src/updater.rs           cek rilis GitHub, unduh, ganti exe sendiri
 src/registry.rs          protokol roblox:// dan entri uninstall
 src/watcher.rs           proses latar yang menunggu Roblox tutup
 src/activity_watcher.rs  baca log Roblox: masuk dan keluar game
@@ -98,7 +125,7 @@ src/models.rs            Settings, State, manifest paket
 
 ## Yang belum ada
 
-Ikon di tray, gaya bootstrapper dan ikon kustom, bahasa, analytics, extract ikon, update otomatis, preset mod
+Ikon di tray, gaya bootstrapper dan ikon kustom, bahasa, analytics, extract ikon, preset mod
 (emoji, kursor, font), updater latar, dan pemasangan WebView2 otomatis.
 
 ## Build
