@@ -142,6 +142,7 @@ function Settings(prev){
         Option({header:t('X.Ov.Cpu.Title'),desc:t('X.Ov.Cpu.Desc'),content:Toggle(()=>S.s.show_cpu,v=>S.s.show_cpu=v)}),
         Option({header:t('X.Ov.Gpu.Title'),desc:t('X.Ov.Gpu.Desc'),content:Toggle(()=>S.s.show_gpu,v=>S.s.show_gpu=v)}),
         Option({header:t('X.Ov.Ram.Title'),desc:t('X.Ov.Ram.Desc'),content:Toggle(()=>S.s.show_ram,v=>S.s.show_ram=v)}),
+        Option({header:t('X.Ov.Fps.Title'),desc:t('X.Ov.Fps.Desc'),content:Toggle(()=>S.s.show_fps,v=>S.s.show_fps=v)}),
         Option({header:t('X.Ov.Preview.Title'),desc:t('X.Ov.Preview.Desc'),content:Btn(t('X.Ov.Preview.Btn'),{icon:'Play28',onclick:async()=>{
           if(dirty()&&!(await save()))return;
           try{await call('overlay_preview')}catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}})}),

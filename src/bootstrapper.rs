@@ -748,7 +748,7 @@ impl Bootstrapper {
         // performance overlay (CPU / GPU / RAM), its own small process
         let show_overlay = {
             let s = app::settings();
-            s.prop.show_cpu || s.prop.show_gpu || s.prop.show_ram
+            s.prop.show_cpu || s.prop.show_gpu || s.prop.show_ram || s.prop.show_fps
         };
         if show_overlay {
             let mut o = Command::new(paths::process());

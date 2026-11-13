@@ -26,6 +26,7 @@ mod console;
 mod deployment;
 mod discord;
 mod fast_flags;
+mod fps;
 mod fonts;
 mod gpu;
 mod installer;
@@ -96,6 +97,8 @@ fn real_main() -> i32 {
         "Tray"
     } else if args.iter().any(|a| a == "-overlay") {
         "Overlay"
+    } else if args.iter().any(|a| a == "-fpsmeter") {
+        "FpsMeter"
     } else if args.iter().any(|a| a == "-accountlogin") {
         "Login"
     } else {
@@ -166,6 +169,9 @@ fn real_main() -> i32 {
     }
     if launch.active("overlay") {
         return overlay::run();
+    }
+    if launch.active("fpsmeter") {
+        return fps::run();
     }
     if launch.active("accountlogin") {
         return match launch.data("accountlogin") {

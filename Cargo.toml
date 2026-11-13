@@ -22,6 +22,7 @@ discord-rich-presence = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Time", "Win32_System_Diagnostics_Etw"] }
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"

@@ -130,6 +130,7 @@ fn settings_to_json(s: &Settings) -> Value {
         "show_cpu": s.show_cpu,
         "show_gpu": s.show_gpu,
         "show_ram": s.show_ram,
+        "show_fps": s.show_fps,
         "gpu_preference": s.gpu_preference,
         "theme": s.theme,
         "language": s.language,
@@ -155,6 +156,7 @@ fn apply_settings_json(s: &mut Settings, v: &Value) {
     s.show_cpu = b("show_cpu", s.show_cpu);
     s.show_gpu = b("show_gpu", s.show_gpu);
     s.show_ram = b("show_ram", s.show_ram);
+    s.show_fps = b("show_fps", s.show_fps);
     s.debug_disable_version_package_cleanup =
         b("debug_disable_version_package_cleanup", s.debug_disable_version_package_cleanup);
     s.gpu_preference = st("gpu_preference", &s.gpu_preference.clone());

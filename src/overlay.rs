@@ -39,6 +39,7 @@ const C=window.__CFG||{};const o=document.getElementById('o');
 const f=(x,d)=>x==null?'--':x.toFixed(d);
 const row=(k,v)=>'<div class="r"><span class="k">'+k+'</span><span>'+v+'</span></div>';
 window.__stats=s=>{let h='';
+if(C.fps)h+=row('FPS',s.fps_ok===false?'N/A':f(s.fps,0));
 if(C.cpu)h+=row('CPU',f(s.cpu,0)+'%');
 if(C.gpu)h+=row('GPU',s.gpu_ok===false?'N/A':f(s.gpu,0)+'%');
 if(C.ram)h+=row('RAM',f(s.ram_used,1)+' / '+f(s.ram_total,1)+' GB');
@@ -244,11 +245,11 @@ enum Ev {
 /// Entry point of `ruststrap -overlay [preview]`.
 pub fn run() -> i32 {
     let preview = app::launch().data("overlay") == Some("preview");
-    let (want_cpu, want_gpu, want_ram) = {
+    let (want_cpu, want_gpu, want_ram, want_fps) = {
         let s = app::settings();
-        (s.prop.show_cpu, s.prop.show_gpu, s.prop.show_ram)
+        (s.prop.show_cpu, s.prop.show_gpu, s.prop.show_ram, s.prop.show_fps)
     };
-    if !(want_cpu || want_gpu || want_ram) {
+    if !(want_cpu || want_gpu || want_ram || want_fps) {
         return 0;
     }
     if !singleton::become_overlay_owner() {
@@ -256,7 +257,7 @@ pub fn run() -> i32 {
         return 0;
     }
 
-    let rows = want_cpu as u32 + want_gpu as u32 + want_ram as u32;
+    let rows = want_cpu as u32 + want_gpu as u32 + want_ram as u32 + want_fps as u32;
     let mut event_loop = EventLoopBuilder::<Ev>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
@@ -283,7 +284,7 @@ pub fn run() -> i32 {
     let _ = window.set_ignore_cursor_events(true);
 
     let mut ctx = WebContext::new(Some(paths::get().base.join("WebView2Overlay")));
-    let cfg = json!({"cpu": want_cpu, "gpu": want_gpu, "ram": want_ram});
+    let cfg = json!({"cpu": want_cpu, "gpu": want_gpu, "ram": want_ram, "fps": want_fps});
     let webview = match WebViewBuilder::new_with_web_context(&mut ctx)
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
@@ -297,6 +298,9 @@ pub fn run() -> i32 {
             return 1;
         }
     };
+
+    // FPS needs the elevated meter (UAC prompt); the preview has no game, so it shows "--"
+    let fps_ok = want_fps && (preview || crate::fps::spawn_elevated());
 
     thread::spawn(move || {
         let mut cpu = Cpu { prev: None };
@@ -330,10 +334,13 @@ pub fn run() -> i32 {
             let c = if want_cpu { cpu.read() } else { None };
             let g = gpu.as_mut().and_then(|g| g.read());
             let r = if want_ram { ram() } else { None };
+            let fp = if want_fps && !preview { crate::fps::read() } else { None };
             let stats = json!({
                 "cpu": c,
                 "gpu": g,
                 "gpu_ok": gpu_ok,
+                "fps": fp,
+                "fps_ok": fps_ok || !want_fps,
                 "ram_used": r.map(|x| x.0),
                 "ram_total": r.map(|x| x.1),
             });

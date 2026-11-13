@@ -23,6 +23,7 @@ const TRAY_MUTEX_NAME: &str = "Local\\Ruststrap_TrayOwner";
 static ROBLOX_MUTEX: AtomicIsize = AtomicIsize::new(0);
 static TRAY_MUTEX: AtomicIsize = AtomicIsize::new(0);
 static OVERLAY_MUTEX: AtomicIsize = AtomicIsize::new(0);
+static NAMED_MUTEX: AtomicIsize = AtomicIsize::new(0);
 
 pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -63,6 +64,11 @@ pub fn become_tray_owner() -> bool {
 /// True when this process is the one that may show the performance overlay.
 pub fn become_overlay_owner() -> bool {
     take("Local\\Ruststrap_OverlayOwner", &OVERLAY_MUTEX)
+}
+
+/// True when this process created the named mutex (nobody else held it). Used by the FPS meter.
+pub fn take_named(name: &str) -> bool {
+    take(name, &NAMED_MUTEX)
 }
 
 /// True when some Ruststrap process already owns the tray.

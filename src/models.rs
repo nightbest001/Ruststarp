@@ -55,6 +55,7 @@ pub struct Settings {
     pub show_cpu: bool,
     pub show_gpu: bool,
     pub show_ram: bool,
+    pub show_fps: bool,
     /// Last game used in Multi Account (not edited by the settings page).
     pub account_place: String,
     pub account_job: String,
@@ -86,6 +87,7 @@ impl Default for Settings {
             show_cpu: false,
             show_gpu: false,
             show_ram: false,
+            show_fps: false,
             account_place: String::new(),
             account_job: String::new(),
             gpu_preference: "default".to_string(),

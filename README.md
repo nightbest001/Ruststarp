@@ -187,9 +187,10 @@ Di Settings > Mods > Lain-lain: **Pilih font...** (file `.ttf` atau `.otf`) meng
 
 ## Overlay performa
 
-Di Pengaturan > Integrasi ada tiga toggle: **Tampilkan CPU**, **Tampilkan GPU**, **Tampilkan RAM**. Kalau salah satu aktif,
+Di Pengaturan > Integrasi ada empat toggle: **Tampilkan FPS**, **Tampilkan CPU**, **Tampilkan GPU**, **Tampilkan RAM**. Kalau salah satu aktif,
 proses kecil `ruststrap -overlay` jalan bareng Roblox dan menampilkan teks di pojok kiri atas layar. Latarnya transparan
 penuh, klik tembus ke game, dan jendelanya menutup sendiri setelah Roblox tutup. Tombol **Pratinjau** menampilkannya 8 detik.
 
 - CPU dari `GetSystemTimes`, RAM dari `GlobalMemoryStatusEx`, GPU dari counter `\GPU Engine(*)\Utilization Percentage` (sama seperti Task Manager, Windows 10 1709 ke atas).
 - Cuma tampil di mode jendela dan borderless, tidak di atas layar penuh eksklusif.
+- FPS dihitung seperti PresentMon: sesi ETW mendengar event `Present` provider DXGI milik proses Roblox. Sesi ETW butuh administrator, jadi `ruststrap -fpsmeter` jalan lewat UAC dan menulis angkanya ke `fps.txt` tiap detik. Overlay (user biasa) cuma membaca file itu. Hanya Direct3D, Vulkan tidak terhitung. Kalau UAC ditolak, FPS tampil "N/A".
