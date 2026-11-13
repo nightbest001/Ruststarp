@@ -743,15 +743,11 @@ function Home(){
   const go=arg=>call('launch',{arg});
   const left=h('div',{style:{display:'flex',flexDirection:'column',justifyContent:'center',padding:'24px 0'}},
     h('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginBottom:'32px'}},h('img',{src:window.APP_ICON,style:{width:'64px',height:'64px'},alt:''}),
-      h('div',null,h('div',{style:{fontSize:'24px'}},NAME),h('div',{class:'t3',style:{fontSize:'12px'}},t('Menu.About.Version',D.version)))),
-    h('div',{style:{display:'flex',flexDirection:'column',alignItems:'center'}},
-      Hyperlink('QuestionCircle48',t('About.Title'),()=>openUrl(D.links.repo)),Hyperlink('Book24',t('LaunchMenu.BloxstrapWiki'),WIKI),Hyperlink('PeopleCommunity28',t('LaunchMenu.RobloxCommunity'),D.links.repo)));
+      h('div',null,h('div',{style:{fontSize:'24px'}},NAME),h('div',{class:'t3',style:{fontSize:'12px'}},t('Menu.About.Version',D.version)))));
   const right=h('div',{style:{padding:'16px'}},
     CardAction({icon:'ArrowRight12',title:t('LaunchMenu.LaunchRoblox'),onclick:()=>go('-player'),style:{marginTop:0}}),
     CardAction({icon:'Wrench24',title:t('LaunchMenu.LaunchRobloxStudio'),onclick:()=>go('-studio')}),
-    CardAction({icon:'Settings28',title:t('LaunchMenu.ConfigureSettings'),onclick:()=>go('-settings')}),
-    h('div',{style:{height:'16px'}}),
-    CardAction({icon:'BookQuestionMark24',title:t('LaunchMenu.Wiki.Title'),desc:t('LaunchMenu.Wiki.Description'),onclick:()=>openUrl(WIKI+'/help/')}));
+    CardAction({icon:'Settings28',title:t('LaunchMenu.ConfigureSettings'),onclick:()=>go('-settings')}));
   const upd=UpdateBar();
   wrap(win,TitleBar({title:NAME}),upd,h('div',{style:{display:'grid',gridTemplateColumns:'280px 1fr',flex:1,minHeight:0}},left,right));root.append(win);document.title=NAME;
   if(D.can_update&&D.settings.check_for_updates)upd.check(false)}
