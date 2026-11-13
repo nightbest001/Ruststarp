@@ -18,6 +18,7 @@
 #[cfg(not(windows))]
 compile_error!("Ruststrap only supports Windows.");
 
+mod accounts;
 mod activity_watcher;
 mod app;
 mod bootstrapper;
@@ -25,12 +26,14 @@ mod console;
 mod deployment;
 mod discord;
 mod fast_flags;
+mod fonts;
 mod gpu;
 mod installer;
 mod json_manager;
 mod lang;
 mod launch_settings;
 mod logger;
+mod login;
 mod menu;
 mod models;
 mod paths;
@@ -38,6 +41,8 @@ mod progress;
 mod diagnostics;
 mod registry;
 mod shortcuts;
+mod singleton;
+mod tray;
 mod ui;
 mod updater;
 mod watcher;
@@ -60,6 +65,7 @@ USAGE
   {exe} update                      look for a newer {name} on GitHub and install it
   {exe}                             open the settings window
   {exe} -settings                   open the settings window
+  {exe} -tray                       run the system tray icon (it also lets several Roblox windows run)
 
 OPTIONS
   -channel <name>   deployment channel (default production)
@@ -83,8 +89,17 @@ fn real_main() -> i32 {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     paths::init(paths::default_base());
-    let is_watcher = args.iter().any(|a| a == "-watcher");
-    logger::initialize(&paths::get().logs, if is_watcher { "Watcher" } else { "Ruststrap" });
+    let kind = if args.iter().any(|a| a == "-watcher") {
+        "Watcher"
+    } else if args.iter().any(|a| a == "-tray") {
+        "Tray"
+    } else if args.iter().any(|a| a == "-accountlogin") {
+        "Login"
+    } else {
+        "Ruststrap"
+    };
+    let is_watcher = kind != "Ruststrap"; // background processes: no update cleanup, no registry refresh
+    logger::initialize(&paths::get().logs, kind);
     crate::log!("App::Main", "Ruststrap {} starting", app::VERSION);
     app::load_all();
     lang::init(&app::settings().prop.language);
@@ -142,6 +157,15 @@ fn real_main() -> i32 {
     }
     if launch.active("watcher") {
         return watcher::run();
+    }
+    if launch.active("tray") {
+        return tray::run();
+    }
+    if launch.active("accountlogin") {
+        return match launch.data("accountlogin") {
+            Some(file) => login::run(file),
+            None => 1,
+        };
     }
     if launch.active("menu") {
         return ui::settings::run();

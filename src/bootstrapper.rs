@@ -595,6 +595,11 @@ impl Bootstrapper {
             return Ok(());
         }
 
+        {
+            let guid = app::dist_state(self.app.studio).prop.version_guid.clone();
+            crate::fonts::prepare_mods(&version_dir, &guid, self.app.studio);
+        }
+
         let mut current = Vec::new();
         walk(&mods, &mods, &mut current);
         let current_set: HashSet<String> = current.iter().map(|s| norm(s)).collect();
@@ -659,6 +664,11 @@ impl Bootstrapper {
         if self.launch_mode == LaunchMode::StudioAuth {
             cmd.spawn().map_err(|e| e.to_string())?;
             return Ok(());
+        }
+
+        // the tray process stays after this window closes, and holds the Roblox mutex for Multi Account
+        if !self.is_studio_launch() {
+            crate::tray::ensure_running();
         }
 
         let rbx_logs = paths::local_app_data().join("Roblox").join("logs");

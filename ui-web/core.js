@@ -76,7 +76,7 @@ window.Combo=function(items,get,set,width){
     pop.style.left=r.left+'px';pop.style.top=Math.max(8,top)+'px';el.classList.add('open');setTimeout(()=>document.addEventListener('mousedown',outside,true))});
   sync();reg(sync);return el};
 window.Text=function(get,set,o){o=o||{};
-  const inp=h(o.multi?'textarea':'input',{placeholder:o.placeholder||'',spellcheck:false,rows:o.rows||3});inp.value=get()||'';
+  const inp=h(o.multi?'textarea':'input',{placeholder:o.placeholder||'',spellcheck:false,rows:o.rows||3,type:o.multi?null:(o.type||null),autocomplete:'off'});inp.value=get()||'';
   inp.addEventListener('input',()=>{set(inp.value);touch()});
   const el=h('div',{class:'tb'},o.icon?icon(o.icon):null,inp);
   reg(()=>{if(document.activeElement!==inp)inp.value=get()||''});el.input=inp;return el};

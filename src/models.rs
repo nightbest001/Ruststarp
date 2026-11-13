@@ -47,6 +47,13 @@ pub struct Settings {
     /// Shows a "Join server" button on the presence.
     pub allow_activity_joining: bool,
     pub show_account_on_rich_presence: bool,
+    /// Keep Ruststrap in the system tray after it starts Roblox.
+    pub keep_in_tray: bool,
+    /// Let several Roblox windows run at once (Multi Account).
+    pub multi_instance: bool,
+    /// Last game used in Multi Account (not edited by the settings page).
+    pub account_place: String,
+    pub account_job: String,
     /// "default" | "saving" | "high"; see `gpu.rs`.
     pub gpu_preference: String,
     /// "system" | "light" | "dark"
@@ -70,6 +77,10 @@ impl Default for Settings {
             use_discord_rich_presence: true,
             allow_activity_joining: true,
             show_account_on_rich_presence: false,
+            keep_in_tray: true,
+            multi_instance: true,
+            account_place: String::new(),
+            account_job: String::new(),
             gpu_preference: "default".to_string(),
             theme: "system".to_string(),
             language: "system".to_string(),

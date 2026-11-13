@@ -56,10 +56,10 @@ function UpdateBar(o){
 
 /* =========================================================== SETTINGS */
 function Settings(prev){
-  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null};
+  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null,acc:(D.accounts||[]).slice(),place:(D.account_last&&D.account_last.place)||'',job:(D.account_last&&D.account_last.job)||''};
   const snap=()=>JSON.stringify([S.s,S.force,S.flags,S.sc]);let saved=prev?prev.saved:snap();
   const dirty=()=>snap()!==saved;
-  let page=prev?prev.page:'integrations';let crumbs=[];
+  let page=prev?prev.page:(['accounts','behaviour','mods','fastflags','appearance','shortcuts','gpu','ruststrap','about'].includes(D.start_page)?D.start_page:'integrations');let crumbs=[];
   /* language changed: build the whole window again in the new language, keeping every unsaved edit */
   const reopen=()=>{root.innerHTML='';Settings({S,saved,page})};
   const win=h('div',{class:'win'});
@@ -67,7 +67,7 @@ function Settings(prev){
   const upd=UpdateBar({beforeRun:async()=>!dirty()||await confirmBox(t('Common.Warning'),t('Menu.UnsavedChanges'))});
 
   const NAV=[
-    ['integrations','Menu.Integrations.Title','Add28'],['behaviour','Menu.Behaviour.Title','PlaySettings20'],['mods','Menu.Mods.Title','WrenchScrewdriver20'],
+    ['integrations','Menu.Integrations.Title','Add28'],['accounts','X.Acc.Title','PeopleCommunity28'],['behaviour','Menu.Behaviour.Title','PlaySettings20'],['mods','Menu.Mods.Title','WrenchScrewdriver20'],
     ['fastflags','Menu.FastFlags.Title','Flag24'],['appearance','Menu.Appearance.Title','PaintBrush24'],['shortcuts','Common.Shortcuts','Apps28'],['gpu','GPU','DeveloperBoard24']];
   const navEl=h('div',{class:'nav'});const crumb=h('div',{class:'crumb'});const pageWrap=h('div',{class:'page-wrap'});
   const items={};
@@ -81,7 +81,7 @@ function Settings(prev){
     clearRegs();page=p;
     const active=p==='fastflageditor'?'fastflags':p;Object.entries(items).forEach(([k,e])=>e.classList.toggle('active',k===active));
     crumb.innerHTML='';
-    const title=({integrations:t('Menu.Integrations.Title'),behaviour:t('Menu.Behaviour.Title'),mods:t('Menu.Mods.Title'),fastflags:t('Menu.FastFlags.Title'),fastflageditor:t('Menu.FastFlagEditor.Title'),
+    const title=({integrations:t('Menu.Integrations.Title'),accounts:t('X.Acc.Title'),behaviour:t('Menu.Behaviour.Title'),mods:t('Menu.Mods.Title'),fastflags:t('Menu.FastFlags.Title'),fastflageditor:t('Menu.FastFlagEditor.Title'),
       appearance:t('Menu.Appearance.Title'),shortcuts:t('Common.Shortcuts'),gpu:'GPU',ruststrap:NAME,about:t('Menu.About.Title')})[p];
     if(p==='fastflageditor'){crumb.append(h('span',{class:'part link',onclick:()=>go('fastflags')},t('Menu.FastFlags.Title')),h('span',{class:'sep'},icon('ChevronRight20')),h('span',null,title))}
     else crumb.append(h('span',null,title));
@@ -144,15 +144,58 @@ function Settings(prev){
           Btn(t('Common.Delete'),{icon:'Delete28',kind:'danger',enabled:()=>S.sel>=0,onclick:()=>{S.s.custom_integrations.splice(S.sel,1);S.sel=-1;paint();touch()}}))),right));
       paint();return el},
 
+    accounts(){
+      const list=h('div');
+      const avatar=a=>a.avatar?h('img',{class:'av',src:a.avatar,alt:'',referrerpolicy:'no-referrer'}):h('div',{class:'av ph'},(a.display_name||a.username||'?').slice(0,1).toUpperCase());
+      async function launch(a){
+        if(dirty()&&!(await save()))return;
+        if(!S.place.trim()){snack({title:t('X.Error'),msg:t('X.Acc.NeedPlace'),kind:'bad',timeout:5000});return}
+        try{await call('account_launch',{user_id:a.user_id,place:S.place,job:S.job});
+          snack({title:t('X.Acc.Launching',a.display_name||a.username),kind:'ok',icon:'CheckmarkCircle32'})}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:7000})}}
+      async function remove(a){
+        if(!(await confirmBox(t('X.Acc.Remove'),t('X.Acc.Remove.Confirm',a.display_name||a.username),t('X.Acc.Remove'),t('Common.Cancel'))))return;
+        try{await call('account_remove',{user_id:a.user_id});S.acc=S.acc.filter(x=>x.user_id!==a.user_id);paint()}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      const paint=()=>{
+        list.innerHTML='';
+        if(!S.acc.length){list.append(Card(h('span',{class:'t2'},t('X.Acc.None'))));return}
+        S.acc.forEach(a=>{
+          const chip=h('span',{class:'chip'});
+          list.append(h('div',{class:'card acc-row'},avatar(a),
+            h('div',{class:'tx'},h('div',{class:'tt'},a.display_name||a.username),h('div',{class:'ds'},'@'+a.username,chip)),
+            Btn(t('X.Acc.Launch'),{kind:'primary',icon:'Play28',onclick:()=>launch(a)}),
+            Btn(null,{icon:'Delete20',cls:'',onclick:()=>remove(a)})));
+          call('account_check',{user_id:a.user_id}).then(ok=>{chip.className='chip '+(ok?'ok':'bad');chip.textContent=ok?t('X.Acc.Ready'):t('X.Acc.Expired')}).catch(()=>{})})};
+      const field=(get,set,ph)=>h('div',{style:{width:'260px'}},Text(get,set,{placeholder:ph}));
+      const el=pg(dsc('X.Acc.Description'),
+        h('div',{class:'btnrow',style:{margin:'0 0 8px'}},Btn(t('X.Acc.Add'),{kind:'primary',icon:'Add20',onclick:()=>addAccount(paint)})),
+        list,sec('X.Acc.Game'),
+        Option({header:t('X.Acc.Place'),desc:t('X.Acc.Place.Desc'),content:field(()=>S.place,v=>S.place=v,'https://www.roblox.com/games/...')}),
+        Option({header:t('X.Acc.Job'),desc:t('X.Acc.Job.Desc'),content:field(()=>S.job,v=>S.job=v,'')}),
+        sec('X.Acc.Windows'),
+        Option({header:t('X.Acc.Multi.Title'),desc:t('X.Acc.Multi.Desc'),content:Toggle(()=>S.s.multi_instance,v=>S.s.multi_instance=v)}));
+      paint();return el},
+
     behaviour(){return pg(dsc('Menu.Behaviour.Description'),
+      Option({header:t('X.Behaviour.Tray.Title'),desc:t('X.Behaviour.Tray.Description'),content:Toggle(()=>S.s.keep_in_tray,v=>S.s.keep_in_tray=v)}),
       Option({header:t('Menu.Behaviour.ConfirmLaunches.Title'),desc:t('Menu.Behaviour.ConfirmLaunches.Description'),content:Toggle(()=>S.s.confirm_launches,v=>S.s.confirm_launches=v)}),
       Option({header:t('Menu.Behaviour.ForceRobloxReinstall.Title'),desc:t('Menu.Behaviour.ForceRobloxReinstall.Description'),enabled:()=>D.installed,content:Toggle(()=>S.force,v=>S.force=v)}),
       Option({header:t('X.Behaviour.KeepPackages.Title'),desc:t('X.Behaviour.KeepPackages.Description'),content:Toggle(()=>S.s.debug_disable_version_package_cleanup,v=>S.s.debug_disable_version_package_cleanup=v)}))},
 
-    mods(){return pg(dsc('Menu.Mods.Description'),
-      CardAction({icon:'Folder24',title:t('Menu.Mods.OpenModsFolder.Title'),desc:t('Menu.Mods.OpenModsFolder.Description'),onclick:()=>call('open_folder',{which:'mods'})}),
-      Card(h('div',{style:{fontSize:'14px'}},t('X.Mods.How.Title')),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px',lineHeight:1.4}},
-        t('X.Mods.How.Text',NAME))))},
+    mods(){
+      const fo=D.font||{};
+      const bad=e=>snack({title:e==='invalid'?t('Menu.Mods.Misc.CustomFont.Invalid'):String(e),icon:'Warning28',kind:'bad'});
+      const pick=async()=>{try{const r=await call('font_choose');if(r){D.font=r;snack({title:t('X.Font.Saved'),msg:t('X.Font.SavedMsg'),icon:'CheckmarkCircle32',kind:'ok'});go('mods')}}catch(e){bad(e)}};
+      const drop=async()=>{try{D.font=await call('font_remove');snack({title:t('X.Font.Removed'),msg:t('X.Font.RemovedMsg'),icon:'CheckmarkCircle32',kind:'ok'});go('mods')}catch(e){bad(e)}};
+      const kids=[dsc('Menu.Mods.Description'),
+        CardAction({icon:'Folder24',title:t('Menu.Mods.OpenModsFolder.Title'),desc:t('Menu.Mods.OpenModsFolder.Description'),onclick:()=>call('open_folder',{which:'mods'})}),
+        sec('Common.Miscellaneous'),
+        Option({header:t('Menu.Mods.Misc.CustomFont.Title'),desc:fo.applied?t('X.Font.Applied',fo.family||fo.file||'CustomFont.ttf'):t('X.Font.None'),
+          content:h('div',{style:{display:'flex',gap:'8px'}},Btn(t('Menu.Mods.Misc.CustomFont.Choose'),{onclick:pick}),Btn(t('Menu.Mods.Misc.CustomFont.Remove'),{enabled:()=>!!(D.font&&D.font.applied),onclick:drop}))})];
+      if(fo.backup)kids.push(h('div',{class:'t3',style:{fontSize:'12px',margin:'-2px 0 10px 4px',lineHeight:1.4}},t('X.Font.Backup')));
+      kids.push(Card(h('div',{style:{fontSize:'14px'}},t('X.Mods.How.Title')),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px',lineHeight:1.4}},t('X.Mods.How.Text',NAME))));
+      return pg(...kids)},
 
     fastflags(){
       const msaa=Combo([{v:'',label:t('Common.Automatic')},{v:'1',label:'1x'},{v:'2',label:'2x'},{v:'4',label:'4x'}],()=>flag(F.MSAA)||'',v=>setFlag(F.MSAA,v||null));
@@ -161,7 +204,6 @@ function Settings(prev){
       return pg(h('div',{class:'desc',style:{marginBottom:'16px'}},t('Menu.FastFlags.Description')),
         Option({header:t('Menu.FastFlags.ManagerEnabled.Title'),desc:t('Menu.FastFlags.ManagerEnabled.Description'),content:Toggle(()=>S.s.use_fast_flag_manager,v=>S.s.use_fast_flag_manager=v)}),
         sec('Common.Presets'),h('div',{class:'h3'},t('Menu.FastFlags.Presets.Categories.Rendering')),
-        h('div',{class:'desc',style:{marginTop:'4px'}},md('Menu.FastFlags.Presets.D3DExclusiveFullscreenInfo',WIKI+'/features/exclusive-fullscreen/')),
         Option({header:t('Menu.FastFlags.Presets.MSAA.Title'),content:msaa}),
         Option({header:t('Menu.FastFlags.Presets.FixDisplayScaling.Title'),desc:t('Menu.FastFlags.Presets.FixDisplayScaling.Description'),content:Toggle(()=>flag(F.SCALE)==='True',v=>setFlag(F.SCALE,v?'True':null))}),
         Option({header:t('Menu.FastFlags.Presets.TextureQuality.Title'),content:tex}),
@@ -242,6 +284,45 @@ function Settings(prev){
 
     about(){return AboutBody()}
   };
+
+  /* Add an account: three ways in (Roblox window, password, pasted cookie) */
+  function addAccount(onDone){
+    let tab=0,busy=false;const f={user:'',pass:'',cookie:''};
+    const err=h('div',{class:'acc-err'});
+    const close=()=>scrim.remove();
+    const scrim=h('div',{class:'scrim',onmousedown:e=>{if(e.target===scrim&&!busy)close()}});
+    const seg=h('div',{class:'seg'});const body=h('div',{class:'acc-b'});
+    const names=[t('X.Acc.Tab.Roblox'),t('X.Acc.Tab.Password'),t('X.Acc.Tab.Cookie')];
+    async function run(fn){
+      if(busy)return;busy=true;err.textContent='';draw();
+      try{const acc=await fn();S.acc=(await call('accounts_list'))||S.acc;close();if(onDone)onDone();
+        snack({title:t('X.Acc.Added',(acc&&(acc.display_name||acc.username))||''),kind:'ok',icon:'CheckmarkCircle32'})}
+      catch(e){busy=false;err.textContent=String(e);draw()}}
+    const big=(label,ic,fn,ready)=>{
+      const b=Btn(busy?t('X.Acc.Wait'):label,{icon:busy?null:ic,cls:'big white'});
+      if(busy){b.disabled=true;b.classList.add('dis')}
+      b.addEventListener('click',()=>{if(ready&&!ready()){err.textContent=t('X.Acc.Fill');return}run(fn)});return b};
+    const lab=k=>h('div',{class:'lbl'},t(k));
+    function draw(){
+      seg.innerHTML='';names.forEach((n,i)=>seg.append(h('div',{class:'st'+(i===tab?' on':''),onclick:()=>{if(busy)return;tab=i;err.textContent='';draw()}},n)));
+      body.innerHTML='';
+      if(tab===0){
+        body.append(h('div',{class:'acc-p'},t('X.Acc.Roblox.Text')),err,big(t('X.Acc.Roblox.Btn'),'Open24',()=>call('account_add_window')))}
+      else if(tab===1){
+        body.append(h('div',{class:'acc-p'},t('X.Acc.Password.Text')),
+          lab('X.Acc.Username'),Text(()=>f.user,v=>f.user=v,{placeholder:t('X.Acc.Username')}),
+          h('div',{style:{height:'10px'}}),lab('X.Acc.Pass'),Text(()=>f.pass,v=>f.pass=v,{type:'password',placeholder:t('X.Acc.Pass')}),
+          h('div',{style:{height:'14px'}}),err,
+          big(t('X.Acc.Password.Btn'),null,()=>call('account_add_password',{username:f.user,password:f.pass}),()=>f.user.trim()&&f.pass))}
+      else{
+        body.append(h('div',{class:'acc-p'},t('X.Acc.Cookie.Text')),
+          Text(()=>f.cookie,v=>f.cookie=v,{multi:true,rows:5,placeholder:'_|WARNING:-DO-NOT-SHARE-THIS...'}),
+          h('div',{style:{height:'14px'}}),err,
+          big(t('X.Acc.Cookie.Btn'),null,()=>call('account_add_cookie',{cookie:f.cookie}),()=>f.cookie.trim()))}}
+    scrim.append(h('div',{class:'dlg acc',role:'dialog'},
+      h('div',{class:'acc-h'},h('div',null,h('div',{class:'dh'},t('X.Acc.Add.Title')),h('div',{class:'sub'},t('X.Acc.Add.Sub'))),
+        h('div',{class:'x',onclick:()=>{if(!busy)close()}},icon('Dismiss20'))),seg,body));
+    document.body.append(scrim);draw()}
 
   function addFlag(){
     let tab=0;const name={v:''},val={v:''},json={v:''};
@@ -329,7 +410,7 @@ function Home(){
   const left=h('div',{style:{display:'flex',flexDirection:'column',justifyContent:'center',padding:'24px 0'}},
     h('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px',marginBottom:'32px'}},h('img',{src:window.APP_ICON,style:{width:'64px',height:'64px'},alt:''}),
       h('div',null,h('div',{style:{fontSize:'24px'}},NAME),h('div',{class:'t3',style:{fontSize:'12px'}},t('Menu.About.Version',D.version)))));
-  const right=h('div',{style:{padding:'16px'}},
+  const right=h('div',{style:{padding:'16px',display:'flex',flexDirection:'column',justifyContent:'center'}},
     CardAction({icon:'ArrowRight12',title:t('LaunchMenu.LaunchRoblox'),onclick:()=>go('-player'),style:{marginTop:0}}),
     CardAction({icon:'Wrench24',title:t('LaunchMenu.LaunchRobloxStudio'),onclick:()=>go('-studio')}),
     CardAction({icon:'Settings28',title:t('LaunchMenu.ConfigureSettings'),onclick:()=>go('-settings')}));

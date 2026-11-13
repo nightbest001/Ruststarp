@@ -25,7 +25,7 @@ use crate::app::{self, error_code, PROJECT_DOWNLOAD_LINK, PROJECT_HELP_LINK, PRO
 use crate::bootstrapper::Bootstrapper;
 use crate::models::{CustomIntegration, FastFlags, LaunchMode, Settings};
 use crate::lang::pick;
-use crate::{fast_flags, gpu, installer, paths, progress, registry, shortcuts, updater};
+use crate::{accounts, fast_flags, gpu, installer, paths, progress, registry, shortcuts, updater};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const HTML: &str = include_str!("../../ui-web/dist/index.html");
@@ -74,7 +74,7 @@ static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::n
 
 // ------------------------------------------------------------------ icon / theme helpers
 
-fn window_icon() -> Option<Icon> {
+pub(crate) fn window_icon() -> Option<Icon> {
     let mut dec = png::Decoder::new(ICON_PNG);
     dec.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = dec.read_info().ok()?;
@@ -125,6 +125,8 @@ fn settings_to_json(s: &Settings) -> Value {
         "use_discord_rich_presence": s.use_discord_rich_presence,
         "allow_activity_joining": s.allow_activity_joining,
         "show_account_on_rich_presence": s.show_account_on_rich_presence,
+        "keep_in_tray": s.keep_in_tray,
+        "multi_instance": s.multi_instance,
         "gpu_preference": s.gpu_preference,
         "theme": s.theme,
         "language": s.language,
@@ -145,6 +147,8 @@ fn apply_settings_json(s: &mut Settings, v: &Value) {
     s.use_discord_rich_presence = b("use_discord_rich_presence", s.use_discord_rich_presence);
     s.allow_activity_joining = b("allow_activity_joining", s.allow_activity_joining);
     s.show_account_on_rich_presence = b("show_account_on_rich_presence", s.show_account_on_rich_presence);
+    s.keep_in_tray = b("keep_in_tray", s.keep_in_tray);
+    s.multi_instance = b("multi_instance", s.multi_instance);
     s.debug_disable_version_package_cleanup =
         b("debug_disable_version_package_cleanup", s.debug_disable_version_package_cleanup);
     s.gpu_preference = st("gpu_preference", &s.gpu_preference.clone());
@@ -206,6 +210,11 @@ fn init_json(mode: Mode) -> Value {
     };
     let sc = if mode == Mode::Settings { shortcuts::current() } else { [false; 5] };
     let flags = if mode == Mode::Settings { flags_to_json(&app::fast_flags().prop) } else { json!({}) };
+    let font = if mode == Mode::Settings { crate::fonts::state_json() } else { json!({}) };
+    let accounts = if mode == Mode::Settings { accounts::list_json() } else { json!([]) };
+    // `ruststrap -menu accounts` (the tray menu) opens the settings window on that page
+    let start_page = app::launch_opt().and_then(|l| l.data("menu")).unwrap_or("").to_string();
+    let account_last = json!({"place": settings.account_place, "job": settings.account_job});
     json!({
         "mode": mode.name(),
         "name": PROJECT_NAME,
@@ -217,6 +226,10 @@ fn init_json(mode: Mode) -> Value {
         "settings": settings_to_json(&settings),
         "force_reinstall": app::state().prop.force_reinstall,
         "flags": flags,
+        "font": font,
+        "accounts": accounts,
+        "start_page": start_page,
+        "account_last": account_last,
         "shortcuts": sc,
         "adapters": adapters,
         "paths": {
@@ -246,6 +259,9 @@ fn open_url(url: &str) {
 
 fn arg_str<'a>(a: &'a Value, k: &str) -> &'a str {
     a.get(k).and_then(Value::as_str).unwrap_or("")
+}
+fn arg_u64(a: &Value, k: &str) -> u64 {
+    a.get(k).and_then(Value::as_u64).unwrap_or(0)
 }
 fn arg_bool(a: &Value, k: &str) -> bool {
     a.get(k).and_then(Value::as_bool).unwrap_or(false)
@@ -356,6 +372,15 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
             }
             Ok(Value::Null)
         }
+        "font_choose" => {
+            let Some(p) = rfd::FileDialog::new().add_filter("Font", &["ttf", "otf"]).pick_file() else { return Ok(Value::Null) };
+            crate::fonts::set_custom_font(&p)?;
+            Ok(crate::fonts::state_json())
+        }
+        "font_remove" => {
+            crate::fonts::reset_custom_font()?;
+            Ok(crate::fonts::state_json())
+        }
         "browse_file" => Ok(rfd::FileDialog::new().pick_file().map(|p| json!(p.to_string_lossy())).unwrap_or(Value::Null)),
         "browse_folder" => Ok(rfd::FileDialog::new().pick_folder().map(|p| json!(p.to_string_lossy())).unwrap_or(Value::Null)),
         "read_file" => {
@@ -412,6 +437,19 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
         "update_progress" => {
             let p = updater::progress();
             Ok(json!({"phase": updater::phase_name(p.phase), "done": p.done, "total": p.total, "error": p.error}))
+        }
+        "accounts_list" => Ok(accounts::list_json()),
+        "account_add_cookie" => accounts::add_cookie(arg_str(a, "cookie")),
+        "account_add_password" => accounts::add_password(arg_str(a, "username"), arg_str(a, "password")),
+        "account_add_window" => accounts::add_window(),
+        "account_remove" => {
+            accounts::remove(arg_u64(a, "user_id"));
+            Ok(Value::Null)
+        }
+        "account_check" => accounts::check(arg_u64(a, "user_id")).map(Value::Bool),
+        "account_launch" => {
+            accounts::launch(arg_u64(a, "user_id"), arg_str(a, "place"), arg_str(a, "job"))?;
+            Ok(Value::Null)
         }
         "launch" => {
             let arg = arg_str(a, "arg");

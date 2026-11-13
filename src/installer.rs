@@ -56,6 +56,7 @@ pub fn install(quiet: bool) -> i32 {
 
     let me = paths::process();
     if me != p.application {
+        crate::tray::stop_others(); // a running tray process would keep the old exe locked
         crate::log!(IDENT, "Copying {} to {}", me.display(), p.application.display());
         if let Err(e) = fs::copy(&me, &p.application) {
             eprintln!("cannot copy the executable: {e}");
@@ -93,6 +94,7 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
     for exe in ["RobloxPlayerBeta.exe", "RobloxStudioBeta.exe"] {
         let _ = Command::new("taskkill").args(["/F", "/IM", exe]).creation_flags(CREATE_NO_WINDOW).output();
     }
+    crate::tray::stop_others();
 
     let _ = shortcuts::apply(&[false; 5]);
 
@@ -105,6 +107,7 @@ pub fn uninstall(quiet: bool, keep_data: bool) -> i32 {
         targets.push(p.modifications.clone());
         targets.push(p.logs.clone());
         files.push(p.base.join("Settings.json"));
+        files.push(p.base.join("Accounts.json"));
     }
     for d in &targets {
         if let Err(e) = fs::remove_dir_all(d) {

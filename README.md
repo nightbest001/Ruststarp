@@ -16,15 +16,35 @@ Bukan produk resmi Roblox.
 |---|---|---|
 | Bahasa | C# (.NET 6, WPF) | Rust |
 | Kebutuhan | .NET Desktop Runtime | tidak ada |
-| Antarmuka | jendela dan tray | jendela (WebView2, HTML/CSS/JS), tanpa tray |
+| Antarmuka | jendela dan tray | jendela (WebView2, HTML/CSS/JS) dan ikon System Tray |
 | Pengaturan | layar settings | jendela pengaturan, atau file JSON dan perintah `flags` |
 | Discord Rich Presence | ada | ada (tanpa tombol kustom dari BloxstrapRPC) |
 | Pilih GPU (dropdown) | tidak ada | ada |
 | Setup awal (Welcome, Install, Completion) | ada | ada |
 | Halaman Appearance | tema, bootstrapper, ikon | tema (sistem/terang/gelap) dan judul bootstrapper |
 | Export diagnostic data | ada | ada |
+| Multi Account (beberapa akun, beberapa jendela Roblox) | tidak ada | ada: halaman Multi Account |
+| Tetap di System Tray setelah Roblox jalan | tidak ada | ada (bisa dimatikan di Behaviour) |
 | Update diri sendiri | ada | ada: banner di dalam app, tanpa unduh lewat browser |
 | Uninstall | Apps & Features dan tombol di app | sama: Apps & Features, tombol di app, atau `ruststrap uninstall` |
+
+## Multi Account dan System Tray
+
+Halaman **Multi Account** menyimpan beberapa akun Roblox dan menjalankan Roblox sebagai salah satunya.
+Tombol **Tambah akun** punya tiga cara masuk:
+
+1. **Masuk lewat Roblox**: jendela Roblox terbuka (passkey dan verifikasi 2 langkah bisa dipakai di situ).
+2. **Password**: username dan password. Kalau Roblox minta captcha atau kode, pakai cara 1.
+3. **Tempel cookie**: tempel cookie `.ROBLOSECURITY`.
+
+Cookie dienkripsi dengan Windows DPAPI (hanya bisa dibuka oleh user Windows yang sama di PC yang sama) dan
+disimpan di `Accounts.json`. Isinya tidak dikirim ke mana pun selain roblox.com.
+
+Setelah Roblox jalan, Ruststrap tidak tertutup penuh: proses kecil `ruststrap -tray` tetap hidup sebagai ikon
+di System Tray (menu: buka Ruststrap, Multi Account, tutup semua jendela Roblox, keluar). Proses itu juga
+memegang mutex Roblox, jadi beberapa akun bisa main bersamaan. Matikan lewat **Behaviour** (tray) atau
+**Multi Account** (beberapa jendela). Untuk beberapa jendela, jalankan akun pertama lewat Ruststrap
+(bukan lewat Roblox yang sudah terbuka lebih dulu).
 
 ## Cara pakai
 
@@ -154,3 +174,12 @@ Pilihan ditulis ke `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` untuk `R
 Jendela mendukung **English** dan **Bahasa Indonesia**. Ganti di Pengaturan > Tampilan > Bahasa
 (default: ikut bahasa Windows). Teks UI ada di `ui-web/strings.json` (EN) dan `ui-web/strings.id.json` (ID);
 setelah mengedit, jalankan `python3 ui-web/build.py`. Pesan dari sisi Rust ada di `src/lang.rs` (`pick("English", "Indonesia")`).
+
+## Font kustom
+
+Di Settings > Mods > Lain-lain: **Pilih font...** (file `.ttf` atau `.otf`) mengganti semua font di Roblox, **Hapus font yang dipakai** mengembalikannya.
+
+- Font disalin ke `Modifications\content\fonts\CustomFont.ttf`, lalu setiap file `content\fonts\families\*.json` ditulis ulang supaya semua face menunjuk ke font itu.
+- Sebelum ada yang diubah, file font asli Roblox dicadangkan ke `FontBackup\<versi>\`. Saat font dihapus, file asli dikembalikan dari cadangan.
+- File dicek dulu (tabel `head`, `cmap`, `name`, outline). Kalau bukan font yang valid, ditolak.
+- Berlaku saat Roblox dijalankan lewat Ruststrap berikutnya.
