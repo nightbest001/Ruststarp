@@ -11,6 +11,7 @@ const FLAGS: &[(&str, &[&str])] = &[
     ("tray", &["tray"]),
     ("overlay", &["overlay"]),
     ("fpsmeter", &["fpsmeter"]),
+    ("memclean", &["memclean"]),
     ("accountlogin", &["accountlogin"]),
     ("backgroundupdater", &["backgroundupdater"]),
     ("quiet", &["quiet"]),

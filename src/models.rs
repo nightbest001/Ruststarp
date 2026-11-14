@@ -61,6 +61,12 @@ pub struct Settings {
     pub account_job: String,
     /// "default" | "saving" | "high"; see `gpu.rs`.
     pub gpu_preference: String,
+    /// "default" | "above" | "high"; see `boost.rs`.
+    pub process_priority: String,
+    /// Areas the RAM cleaner tab cleans (bit mask, see `memory.rs`).
+    pub memory_mask: u32,
+    /// Keep Roblox off CPU core 0 (needs more than 2 cores).
+    pub skip_core0: bool,
     /// "system" | "light" | "dark"
     pub theme: String,
     /// "system" | "en" | "id"; see `lang.rs`.
@@ -91,6 +97,9 @@ impl Default for Settings {
             account_place: String::new(),
             account_job: String::new(),
             gpu_preference: "default".to_string(),
+            process_priority: "default".to_string(),
+            skip_core0: false,
+            memory_mask: crate::memory::DEFAULT_MASK,
             theme: "system".to_string(),
             language: "system".to_string(),
             bootstrapper_title: crate::app::PROJECT_NAME.to_string(),

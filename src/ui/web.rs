@@ -132,6 +132,9 @@ fn settings_to_json(s: &Settings) -> Value {
         "show_ram": s.show_ram,
         "show_fps": s.show_fps,
         "gpu_preference": s.gpu_preference,
+        "process_priority": s.process_priority,
+        "skip_core0": s.skip_core0,
+        "memory_mask": s.memory_mask,
         "theme": s.theme,
         "language": s.language,
         "bootstrapper_title": s.bootstrapper_title,
@@ -160,6 +163,11 @@ fn apply_settings_json(s: &mut Settings, v: &Value) {
     s.debug_disable_version_package_cleanup =
         b("debug_disable_version_package_cleanup", s.debug_disable_version_package_cleanup);
     s.gpu_preference = st("gpu_preference", &s.gpu_preference.clone());
+    s.process_priority = st("process_priority", &s.process_priority.clone());
+    s.skip_core0 = b("skip_core0", s.skip_core0);
+    if let Some(n) = v.get("memory_mask").and_then(Value::as_u64) {
+        s.memory_mask = (n as u32) & 0xFF;
+    }
     s.theme = st("theme", &s.theme.clone());
     s.language = st("language", &s.language.clone());
     if !matches!(s.language.as_str(), "system" | "en" | "id") {
@@ -234,6 +242,7 @@ fn init_json(mode: Mode) -> Value {
         "settings": settings_to_json(&settings),
         "force_reinstall": app::state().prop.force_reinstall,
         "flags": flags,
+        "lowspec_flags": fast_flags::LOW_SPEC_FLAGS.iter().map(|(k, v)| json!([k, v])).collect::<Vec<_>>(),
         "font": font,
         "accounts": accounts,
         "start_page": start_page,
@@ -313,6 +322,8 @@ fn save(a: &Value) -> Result<Value, String> {
     apply_settings_json(&mut settings, a.get("settings").unwrap_or(&Value::Null));
     let pref = gpu::Pref::parse(&settings.gpu_preference).unwrap_or(gpu::Pref::Default);
     settings.gpu_preference = pref.as_str().to_string();
+    let prio = crate::boost::Priority::parse(&settings.process_priority).unwrap_or(crate::boost::Priority::Default);
+    settings.process_priority = prio.as_str().to_string();
 
     let mut flags: FastFlags = FastFlags::new();
     if let Some(o) = a.get("flags").and_then(Value::as_object) {
@@ -367,6 +378,8 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
             Ok(Value::Null)
         }
         "save" => save(a),
+        "mem_info" => Ok(crate::memory::info_json()),
+        "mem_clean" => crate::memory::clean_for_ui(arg_u64(a, "mask") as u32),
         "overlay_preview" => {
             Command::new(paths::process())
                 .args(["-overlay", "preview"])

@@ -22,6 +22,7 @@ mod accounts;
 mod activity_watcher;
 mod app;
 mod bootstrapper;
+mod boost;
 mod console;
 mod deployment;
 mod discord;
@@ -35,6 +36,7 @@ mod lang;
 mod launch_settings;
 mod logger;
 mod login;
+mod memory;
 mod menu;
 mod models;
 mod overlay;
@@ -172,6 +174,9 @@ fn real_main() -> i32 {
     }
     if launch.active("fpsmeter") {
         return fps::run();
+    }
+    if launch.active("memclean") {
+        return memory::run(launch.data("memclean"));
     }
     if launch.active("accountlogin") {
         return match launch.data("accountlogin") {

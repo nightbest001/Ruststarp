@@ -11,6 +11,21 @@ pub const PRESET_FLAGS: &[(&str, &str)] = &[
     ("Rendering.TextureQuality.Level", "DFIntTextureQualityOverride"),
 ];
 
+/// "Low-spec" preset: shadows off, lowest render quality, lowest textures, no grass, no post effects.
+/// Roblox renames or drops flags between updates, so every entry here is a best guess that must be tested.
+/// A flag Roblox does not know is simply ignored, so a stale entry is harmless.
+pub const LOW_SPEC_FLAGS: &[(&str, &str)] = &[
+    ("DFFlagTextureQualityOverrideEnabled", "True"),
+    ("DFIntTextureQualityOverride", "0"),
+    ("FIntDebugForceMSAASamples", "1"),
+    ("FIntRenderShadowIntensity", "0"),
+    ("DFIntDebugFRMQualityLevelOverride", "1"),
+    ("FIntFRMMinGrassDistance", "0"),
+    ("FIntFRMMaxGrassDistance", "0"),
+    ("FIntRenderGrassDetailStrands", "0"),
+    ("FFlagDisablePostFx", "True"),
+];
+
 pub fn set_value(flags: &mut FastFlags, key: &str, value: Option<&str>) {
     const IDENT: &str = "FastFlagManager::SetValue";
     match value {
@@ -95,12 +110,17 @@ pub fn cli(args: &[String]) -> i32 {
                         set_value(&mut ff.prop, preset_flag("Rendering.TextureQuality.Level").unwrap(), Some(val));
                     }
                 }
+                "lowspec" => {
+                    for (k, v) in LOW_SPEC_FLAGS {
+                        set_value(&mut ff.prop, k, if val == "on" { Some(*v) } else { None });
+                    }
+                }
                 "disable-scaling" => {
                     let v = if val == "on" { Some("True") } else { None };
                     set_value(&mut ff.prop, preset_flag("Rendering.DisableScaling").unwrap(), v);
                 }
                 _ => {
-                    eprintln!("presets: msaa <default|1|2|4>, texture <default|0..3>, disable-scaling <on|off>");
+                    eprintln!("presets: msaa <default|1|2|4>, texture <default|0..3>, disable-scaling <on|off>, lowspec <on|off>");
                     return 1;
                 }
             }

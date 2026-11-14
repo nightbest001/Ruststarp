@@ -59,7 +59,7 @@ function Settings(prev){
   const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null,acc:(D.accounts||[]).slice(),place:(D.account_last&&D.account_last.place)||'',job:(D.account_last&&D.account_last.job)||''};
   const snap=()=>JSON.stringify([S.s,S.force,S.flags,S.sc]);let saved=prev?prev.saved:snap();
   const dirty=()=>snap()!==saved;
-  let page=prev?prev.page:(['accounts','behaviour','mods','fastflags','appearance','shortcuts','gpu','ruststrap','about'].includes(D.start_page)?D.start_page:'integrations');let crumbs=[];
+  let page=prev?prev.page:(['accounts','behaviour','mods','fastflags','appearance','shortcuts','gpu','memory','ruststrap','about'].includes(D.start_page)?D.start_page:'integrations');let crumbs=[];
   /* language changed: build the whole window again in the new language, keeping every unsaved edit */
   const reopen=()=>{root.innerHTML='';Settings({S,saved,page})};
   const win=h('div',{class:'win'});
@@ -68,7 +68,7 @@ function Settings(prev){
 
   const NAV=[
     ['integrations','Menu.Integrations.Title','Add28'],['accounts','X.Acc.Title','PeopleCommunity28'],['behaviour','Menu.Behaviour.Title','PlaySettings20'],['mods','Menu.Mods.Title','WrenchScrewdriver20'],
-    ['fastflags','Menu.FastFlags.Title','Flag24'],['appearance','Menu.Appearance.Title','PaintBrush24'],['shortcuts','Common.Shortcuts','Apps28'],['gpu','GPU','DeveloperBoard24']];
+    ['fastflags','Menu.FastFlags.Title','Flag24'],['appearance','Menu.Appearance.Title','PaintBrush24'],['shortcuts','Common.Shortcuts','Apps28'],['gpu','GPU','DeveloperBoard24'],['memory','X.Mem.Title','Wrench24']];
   const navEl=h('div',{class:'nav'});const crumb=h('div',{class:'crumb'});const pageWrap=h('div',{class:'page-wrap'});
   const items={};
   function navItem(id,label,ic,o){const el=h('div',{class:'nav-item'+(o&&o.last?' last':''),onclick:()=>(o&&o.action)?o.action():go(id)},icon(ic),h('span',null,label));items[id]=el;return el}
@@ -82,7 +82,7 @@ function Settings(prev){
     const active=p==='fastflageditor'?'fastflags':p;Object.entries(items).forEach(([k,e])=>e.classList.toggle('active',k===active));
     crumb.innerHTML='';
     const title=({integrations:t('Menu.Integrations.Title'),accounts:t('X.Acc.Title'),behaviour:t('Menu.Behaviour.Title'),mods:t('Menu.Mods.Title'),fastflags:t('Menu.FastFlags.Title'),fastflageditor:t('Menu.FastFlagEditor.Title'),
-      appearance:t('Menu.Appearance.Title'),shortcuts:t('Common.Shortcuts'),gpu:'GPU',ruststrap:NAME,about:t('Menu.About.Title')})[p];
+      appearance:t('Menu.Appearance.Title'),shortcuts:t('Common.Shortcuts'),gpu:'GPU',memory:t('X.Mem.Title'),ruststrap:NAME,about:t('Menu.About.Title')})[p];
     if(p==='fastflageditor'){crumb.append(h('span',{class:'part link',onclick:()=>go('fastflags')},t('Menu.FastFlags.Title')),h('span',{class:'sep'},icon('ChevronRight20')),h('span',null,title))}
     else crumb.append(h('span',null,title));
     const body=PAGES[p]();pageWrap.innerHTML='';pageWrap.scrollTop=0;pageWrap.append(body);touch()}
@@ -208,12 +208,18 @@ function Settings(prev){
       const msaa=Combo([{v:'',label:t('Common.Automatic')},{v:'1',label:'1x'},{v:'2',label:'2x'},{v:'4',label:'4x'}],()=>flag(F.MSAA)||'',v=>setFlag(F.MSAA,v||null));
       const texOn=()=>flag(F.TEXON)!=null;
       const tex=Combo([{v:'',label:t('Common.Automatic')},{v:'0',label:t('X.Level',0)},{v:'1',label:t('X.Level',1)},{v:'2',label:t('X.Level',2)},{v:'3',label:t('X.Level',3)}],()=>texOn()?(flag(F.TEXLV)||''):'',v=>{if(!v){setFlag(F.TEXON,null);setFlag(F.TEXLV,null)}else{setFlag(F.TEXON,'True');setFlag(F.TEXLV,v)}});
+      const LS=D.lowspec_flags||[];
+      const lowOn=()=>LS.length>0&&LS.every(([k,v])=>flag(k)===v);
+      const setLow=on=>LS.forEach(([k,v])=>setFlag(k,on?v:null));
       return pg(h('div',{class:'desc',style:{marginBottom:'16px'}},t('Menu.FastFlags.Description')),
         Option({header:t('Menu.FastFlags.ManagerEnabled.Title'),desc:t('Menu.FastFlags.ManagerEnabled.Description'),content:Toggle(()=>S.s.use_fast_flag_manager,v=>S.s.use_fast_flag_manager=v)}),
         sec('Common.Presets'),h('div',{class:'h3'},t('Menu.FastFlags.Presets.Categories.Rendering')),
         Option({header:t('Menu.FastFlags.Presets.MSAA.Title'),content:msaa}),
         Option({header:t('Menu.FastFlags.Presets.FixDisplayScaling.Title'),desc:t('Menu.FastFlags.Presets.FixDisplayScaling.Description'),content:Toggle(()=>flag(F.SCALE)==='True',v=>setFlag(F.SCALE,v?'True':null))}),
         Option({header:t('Menu.FastFlags.Presets.TextureQuality.Title'),content:tex}),
+        h('div',{class:'h3',style:{marginTop:'16px'}},t('X.LowSpec.Category')),
+        Option({header:t('X.LowSpec.Title'),desc:t('X.LowSpec.Desc'),content:Toggle(lowOn,setLow)}),
+        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},t('X.LowSpec.Note')),
         h('div',{style:{height:'24px'}}),
         Option({header:t('Menu.FastFlags.Reset.Title'),content:Btn(t('Common.Reset'),{onclick:async()=>{if(await confirmBox(t('Common.Warning'),t('Menu.FastFlags.Reset.Title')+'?')){S.flags={};touch();go('fastflags')}}})}),
         CardAction({icon:'EditSettings24',title:t('Menu.FastFlagEditor.Title'),desc:t('Menu.FastFlags.Editor.Description'),onclick:()=>go('fastflageditor')}))},
@@ -269,7 +275,45 @@ function Settings(prev){
       return pg(h('div',{class:'desc'},t('X.Gpu.Description')),sec('X.Gpu.Detected'),
         D.adapters.length?D.adapters.map(a=>Card(h('div',null,a.name),h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px'}},`${a.vendor}  ·  ${kind(a)}  ·  ${a.vram_mb?a.vram_mb+' MB':t('X.Gpu.VramUnknown')}`))):Card(h('span',{class:'t2'},t('X.Gpu.None'))),
         sec('X.Gpu.Use'),Option({header:t('X.Gpu.Card'),desc:t('X.Gpu.CardDesc'),content:cur}),hint,
-        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},t('X.Gpu.Note',NAME)))},
+        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},t('X.Gpu.Note',NAME)),
+        sec('X.Boost.Title'),
+        Option({header:t('X.Boost.Priority'),desc:t('X.Boost.PriorityDesc'),content:Combo([{v:'default',label:t('X.Boost.Normal')},{v:'above',label:t('X.Boost.Above')},{v:'high',label:t('X.Boost.High')}],()=>S.s.process_priority,v=>S.s.process_priority=v,200)}),
+        Option({header:t('X.Boost.Core0'),desc:t('X.Boost.Core0Desc'),content:Toggle(()=>S.s.skip_core0,v=>S.s.skip_core0=v)}),
+        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},t('X.Boost.Note')))},
+
+    memory(){
+      const bit=b=>Toggle(()=>(S.s.memory_mask&b)!==0,v=>{S.s.memory_mask=v?(S.s.memory_mask|b):(S.s.memory_mask&~b)});
+      const row=(b,k)=>Option({header:t('X.Mem.'+k),desc:t('X.Mem.'+k+'.Desc'),content:bit(b)});
+      const fmt=n=>n>=1073741824?(n/1073741824).toFixed(1)+' GB':Math.round(n/1048576)+' MB';
+      const txt=h('div',null,'...');const sub=h('div',{class:'t3',style:{fontSize:'12px',marginTop:'2px'}});
+      const fill=h('div',{style:{height:'100%',width:'0%',background:'var(--accent)',borderRadius:'3px',transition:'width .4s'}});
+      const bar=h('div',{style:{height:'6px',background:'var(--ctl)',borderRadius:'3px',marginTop:'10px',overflow:'hidden'}},fill);
+      const id=window.__memLoop=(window.__memLoop||0)+1;
+      const tick=async()=>{
+        if(id!==window.__memLoop||page!=='memory')return;
+        try{const m=await call('mem_info');
+          txt.textContent=t('X.Mem.Used',fmt(m.used),fmt(m.total),m.load);
+          sub.textContent=t('X.Mem.Free',fmt(m.avail))+(m.admin?'':'  ·  '+t('X.Mem.NeedAdmin'));
+          fill.style.width=m.load+'%';fill.style.background=m.load>=85?'var(--crit)':m.load>=70?'var(--warn)':'var(--accent)'}catch(e){}
+        setTimeout(tick,2000)};
+      tick();
+      let busy=false;const res=h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}});
+      const btn=Btn(t('X.Mem.Clean'),{kind:'primary',icon:'Wrench24',enabled:()=>!busy&&S.s.memory_mask!==0,onclick:async()=>{
+        busy=true;touch();res.textContent=t('X.Mem.Working');
+        try{const r=await call('mem_clean',{mask:S.s.memory_mask});
+          res.textContent=t('X.Mem.Done',fmt(r.freed))+(r.errors&&r.errors.length?'  ·  '+t('X.Mem.Errors')+': '+r.errors.join(', '):'');
+          snack({title:t('X.Mem.Done',fmt(r.freed)),kind:r.errors&&r.errors.length?'bad':'ok',icon:'CheckmarkCircle32'})}
+        catch(e){res.textContent='';snack({title:t('X.Mem.Failed'),msg:String(e),kind:'bad',timeout:6000})}
+        busy=false;touch()}});
+      return pg(h('div',{class:'desc'},t('X.Mem.Description')),
+        Card(txt,sub,bar),
+        Option({header:t('X.Mem.CleanNow'),desc:t('X.Mem.CleanNow.Desc'),content:btn}),res,
+        sec('X.Mem.Areas'),
+        row(1,'WorkingSet'),row(2,'FileCache'),row(128,'ModFileCache'),row(4,'Standby0'),row(32,'Combine'),row(64,'Registry'),
+        h('div',{class:'h3',style:{marginTop:'16px'}},t('X.Mem.Risky')),
+        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'4px'}},t('X.Mem.RiskyDesc')),
+        row(8,'Standby'),row(16,'ModList'),
+        h('div',{class:'t3',style:{fontSize:'12px',marginTop:'8px'}},t('X.Mem.Note')))},
 
     ruststrap(){
       const ec={v:true},el={v:true};

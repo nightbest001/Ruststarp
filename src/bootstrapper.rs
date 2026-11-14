@@ -685,6 +685,9 @@ impl Bootstrapper {
         };
         let pid = child.id();
         crate::log!(IDENT, "Started Roblox (PID {pid}), waiting for log file");
+        if !self.is_studio_launch() {
+            crate::boost::apply(pid);
+        }
         app::say(&crate::lang::pick(
             &format!("Launched {}.", self.app.product_name),
             &format!("{} sudah jalan.", self.app.product_name),
