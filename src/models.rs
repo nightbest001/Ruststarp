@@ -51,6 +51,21 @@ pub struct Settings {
     pub keep_in_tray: bool,
     /// Let several Roblox windows run at once (Multi Account).
     pub multi_instance: bool,
+    /// Roblox window layout (see `layout.rs`): columns (0 = automatic), gap in pixels, no title bar,
+    /// and arrange again by itself when a window opens or closes.
+    pub layout_columns: u32,
+    pub layout_gap: u32,
+    pub layout_borderless: bool,
+    pub layout_auto: bool,
+    /// Max alts (see `max_alts.rs`): Roblox windows that are not in front get Idle priority and efficiency
+    /// mode; `max_alts_trim` also takes back their unused memory.
+    pub max_alts: bool,
+    pub max_alts_trim: bool,
+    /// Anti-AFK (see `anti_afk.rs`): every `anti_afk_minutes` each background Roblox window gets one small
+    /// input; `anti_afk_action` is "nudge" | "space" | "zoom".
+    pub anti_afk: bool,
+    pub anti_afk_minutes: u32,
+    pub anti_afk_action: String,
     /// Performance overlay on top of the game (see `overlay.rs`).
     pub show_cpu: bool,
     pub show_gpu: bool,
@@ -59,6 +74,8 @@ pub struct Settings {
     /// Last game used in Multi Account (not edited by the settings page).
     pub account_place: String,
     pub account_job: String,
+    /// Player Multi Account follows (empty = not following).
+    pub account_follow: String,
     /// "default" | "saving" | "high"; see `gpu.rs`.
     pub gpu_preference: String,
     /// "default" | "above" | "high"; see `boost.rs`.
@@ -90,12 +107,22 @@ impl Default for Settings {
             show_account_on_rich_presence: false,
             keep_in_tray: true,
             multi_instance: true,
+            layout_columns: 0,
+            layout_gap: 0,
+            layout_borderless: false,
+            layout_auto: false,
+            max_alts: false,
+            max_alts_trim: false,
+            anti_afk: false,
+            anti_afk_minutes: 12,
+            anti_afk_action: "nudge".to_string(),
             show_cpu: false,
             show_gpu: false,
             show_ram: false,
             show_fps: false,
             account_place: String::new(),
             account_job: String::new(),
+            account_follow: String::new(),
             gpu_preference: "default".to_string(),
             process_priority: "default".to_string(),
             skip_core0: false,

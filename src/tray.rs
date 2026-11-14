@@ -43,6 +43,7 @@ const CMD_OPEN: usize = 1;
 const CMD_ACCOUNTS: usize = 2;
 const CMD_CLOSE_ROBLOX: usize = 3;
 const CMD_EXIT: usize = 4;
+const CMD_ARRANGE: usize = 5;
 
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 
@@ -207,9 +208,10 @@ fn close_roblox() {
 }
 
 fn show_menu(hwnd: isize) {
-    let items: [(usize, String); 3] = [
+    let items: [(usize, String); 4] = [
         (CMD_OPEN, pick("Open Ruststrap", "Buka Ruststrap")),
         (CMD_ACCOUNTS, pick("Multi Account", "Multi Akun")),
+        (CMD_ARRANGE, pick("Arrange Roblox windows", "Susun jendela Roblox")),
         (CMD_CLOSE_ROBLOX, pick("Close all Roblox windows", "Tutup semua jendela Roblox")),
     ];
     let exit = pick("Exit", "Keluar");
@@ -239,6 +241,12 @@ fn show_menu(hwnd: isize) {
     match cmd {
         CMD_OPEN => open_ruststrap(&[]),
         CMD_ACCOUNTS => open_ruststrap(&["-menu", "accounts"]),
+        CMD_ARRANGE => {
+            // off the message loop: it asks every Roblox window to move
+            thread::spawn(|| {
+                let _ = crate::layout::arrange_from_disk();
+            });
+        }
         CMD_CLOSE_ROBLOX => close_roblox(),
         CMD_EXIT => {
             // SAFETY: `hwnd` is our own window.
@@ -313,6 +321,9 @@ pub fn run() -> i32 {
             return 1;
         }
         add_icon(hwnd);
+        crate::layout::start_auto_watch();
+        crate::max_alts::start();
+        crate::anti_afk::start();
         crate::log!(IDENT, "Tray icon is up");
 
         let mut msg = Msg { hwnd: 0, message: 0, wparam: 0, lparam: 0, time: 0, pt: Point { x: 0, y: 0 }, private: 0 };
@@ -321,6 +332,7 @@ pub fn run() -> i32 {
             DispatchMessageW(&msg);
         }
     }
+    crate::max_alts::reset_now();
     crate::log!(IDENT, "Tray closed");
     0
 }

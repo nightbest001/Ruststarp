@@ -39,7 +39,7 @@ impl Priority {
         }
     }
 
-    fn class(self) -> Option<u32> {
+    pub(crate) fn class(self) -> Option<u32> {
         match self {
             Self::Default => None,
             Self::AboveNormal => Some(ABOVE_NORMAL_PRIORITY_CLASS),
