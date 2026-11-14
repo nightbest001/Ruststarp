@@ -291,3 +291,9 @@ a.lnk:hover{text-decoration:underline}
 .chip.ok{background:rgba(63,185,80,.18);color:#3fb950}.chip.bad{background:rgba(255,107,107,.18);color:#ff6b6b}
 .grp-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:10px;margin:8px 0;padding:4px 2px}
 .acc-b .lbl{margin-bottom:6px}
+<<<<<<< HEAD
+=======
+.dlg.acc .acc-h,.dlg.acc .seg,.dlg.acc .df{flex:none}
+.dlg.acc .acc-b{flex:1 1 auto;min-height:0;overflow:auto}
+.grp-list{max-height:150px}
+>>>>>>> e4b42aa (v0.1.7)

@@ -42,6 +42,11 @@ Tombol **Tambah akun** punya tiga cara masuk:
 Cookie dienkripsi dengan Windows DPAPI (hanya bisa dibuka oleh user Windows yang sama di PC yang sama) dan
 disimpan di `Accounts.json`. Isinya tidak dikirim ke mana pun selain roblox.com.
 
+Supaya beberapa akun tidak saling menutup, Ruststrap memegang dua nama kunci Roblox
+(`ROBLOX_singletonMutex` dan `ROBLOX_singletonEvent`) di satu thread yang tidak pernah berhenti, sebelum Roblox
+pertama dijalankan. Kalau ada Roblox yang sudah terbuka lebih dulu (tidak lewat Ruststrap), ia memegang kunci itu:
+tutup semua jendela Roblox, lalu jalankan akun dari Ruststrap. Log ada di `Singleton::Roblox`.
+
 Setelah Roblox jalan, Ruststrap tidak tertutup penuh: proses kecil `ruststrap -tray` tetap hidup sebagai ikon
 di System Tray (menu: buka Ruststrap, Multi Account, tutup semua jendela Roblox, keluar). Proses itu juga
 memegang mutex Roblox, jadi beberapa akun bisa main bersamaan. Matikan lewat **Behaviour** (tray) atau

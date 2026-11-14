@@ -407,8 +407,13 @@ function Settings(prev){
         lab('X.Grp.Place'),Text(()=>f.place,v=>f.place=v,{placeholder:'123456789 / https://www.roblox.com/games/...'}),
         h('div',{style:{height:'10px'}}),lab('X.Grp.Follow'),Text(()=>f.follow,v=>f.follow=v,{placeholder:'username'}),
         h('div',{style:{height:'10px'}}),lab('X.Grp.Job'),Text(()=>f.job,v=>f.job=v,{placeholder:''}),
+<<<<<<< HEAD
         h('div',{style:{height:'12px'}}),err,
         h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},Btn(t('Common.Cancel'),{onclick:()=>{if(!busy)close()}}),Btn(t('X.Grp.Save'),{kind:'primary',onclick:submit})))));
+=======
+        h('div',{style:{height:'12px'}}),err),
+      h('div',{class:'df'},Btn(t('Common.Cancel'),{onclick:()=>{if(!busy)close()}}),Btn(t('X.Grp.Save'),{kind:'primary',onclick:submit}))));
+>>>>>>> e4b42aa (v0.1.7)
     document.body.append(scrim);
     setTimeout(()=>{const i=scrim.querySelector('input');if(i&&!g)i.focus()},30)}
 
