@@ -289,3 +289,5 @@ a.lnk:hover{text-decoration:underline}
 .av.ph{display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--tx2)}
 .chip{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;font-size:11px}.chip:empty{display:none}
 .chip.ok{background:rgba(63,185,80,.18);color:#3fb950}.chip.bad{background:rgba(255,107,107,.18);color:#ff6b6b}
+.grp-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:10px;margin:8px 0;padding:4px 2px}
+.acc-b .lbl{margin-bottom:6px}

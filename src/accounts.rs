@@ -281,6 +281,61 @@ fn launch_app_uri(ticket: &str) -> String {
     )
 }
 
+/// Join the server a player is in. Roblox finds the player's game and server by itself.
+fn follow_uri(ticket: &str, target: u64) -> String {
+    let tracker = 100_000_000_000u64 + rand_u64(3) % 900_000_000_000u64;
+    let now = chrono::Utc::now().timestamp_millis();
+    let url = format!("https://assets.roblox.com/game/placelauncher.ashx?request=RequestFollowUser&userId={target}");
+    format!(
+        "roblox-player:1+launchmode:play+gameinfo:{ticket}+launchtime:{now}+placelauncherurl:{}+browsertrackerid:{tracker}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp",
+        pct(&url)
+    )
+}
+
+/// The player to follow: a username (with or without @) or a roblox.com/users/<id> link.
+pub fn resolve_user(input: &str) -> Result<u64, String> {
+    let s = input.trim().trim_start_matches('@').trim();
+    if s.is_empty() {
+        return Err(pick("Type the name of the player to follow.", "Isi nama pemain yang mau diikuti."));
+    }
+    if let Some(i) = s.find("/users/") {
+        let digits: String = s[i + "/users/".len()..].chars().take_while(char::is_ascii_digit).collect();
+        if let Ok(n) = digits.parse::<u64>() {
+            if n > 0 {
+                return Ok(n);
+            }
+        }
+    }
+    let body = json!({"usernames": [s], "excludeBannedUsers": false}).to_string();
+    let mut csrf = String::new();
+    for _ in 0..2 {
+        let mut rq = app::http()
+            .post("https://users.roblox.com/v1/usernames/users")
+            .header("Content-Type", "application/json")
+            .body(body.clone());
+        if !csrf.is_empty() {
+            rq = rq.header("X-CSRF-TOKEN", csrf.clone());
+        }
+        let r = rq.send().map_err(net)?;
+        if r.status() == reqwest::StatusCode::FORBIDDEN && csrf.is_empty() {
+            if let Some(t) = r.headers().get("x-csrf-token").and_then(|v| v.to_str().ok()) {
+                csrf = t.to_string(); // first answer only hands out the CSRF token: ask again
+                continue;
+            }
+        }
+        if !r.status().is_success() {
+            return Err(format!("Roblox answered HTTP {}", r.status()));
+        }
+        let v: Value = r.json().map_err(net)?;
+        return v
+            .pointer("/data/0/id")
+            .and_then(Value::as_u64)
+            .filter(|n| *n > 0)
+            .ok_or_else(|| pick("No player with that name.", "Tidak ada pemain dengan nama itu."));
+    }
+    Err(pick("Roblox did not accept the request.", "Roblox tidak menerima permintaan."))
+}
+
 // ------------------------------------------------------------------ public API
 
 fn to_json(a: &Account) -> Value {
@@ -411,6 +466,13 @@ pub fn remove(user_id: u64) {
         l.retain(|a| a.user_id != user_id);
         persist(l);
     });
+    // a removed account also leaves every group
+    with_groups(|g| {
+        for grp in g.iter_mut() {
+            grp.members.retain(|m| *m != user_id);
+        }
+        persist_groups(g);
+    });
 }
 
 /// Is the saved session still good? `Ok(false)` means Roblox says it is signed out; `Err` means we could not ask.
@@ -447,10 +509,13 @@ pub fn parse_place(input: &str) -> Option<u64> {
     digits.parse().ok().filter(|n| *n > 0)
 }
 
-/// Starts Roblox as `user_id`. An empty `place` opens the Roblox app without a game.
+/// Starts Roblox as `user_id`. A `follow` name joins the server that player is in (it wins over the
+/// place and server). An empty `place` opens the Roblox app without a game.
 /// The window and updates come from the normal launch path.
-pub fn launch(user_id: u64, place: &str, job: &str) -> Result<(), String> {
-    let place_id = if place.trim().is_empty() {
+pub fn launch(user_id: u64, place: &str, job: &str, follow: &str) -> Result<(), String> {
+    let follow = follow.trim();
+    let target = if follow.is_empty() { None } else { Some(resolve_user(follow)?) };
+    let place_id = if target.is_some() || place.trim().is_empty() {
         None
     } else {
         Some(parse_place(place).ok_or_else(|| {
@@ -458,16 +523,17 @@ pub fn launch(user_id: u64, place: &str, job: &str) -> Result<(), String> {
         })?)
     };
     let job = job.trim();
-    if !job.is_empty() && !job.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+    if target.is_none() && !job.is_empty() && !job.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
         return Err(pick("The server ID looks wrong.", "Server ID sepertinya salah."));
     }
     let enc = with(|l| l.iter().find(|a| a.user_id == user_id).map(|a| a.cookie.clone()))
         .ok_or_else(|| pick("That account is gone.", "Akun itu sudah tidak ada."))?;
     let cookie = unprotect(&enc)?;
     let ticket = auth_ticket(&cookie)?;
-    let uri = match place_id {
-        Some(id) => launch_uri(&ticket, id, job),
-        None => launch_app_uri(&ticket),
+    let uri = match (target, place_id) {
+        (Some(t), _) => follow_uri(&ticket, t),
+        (None, Some(id)) => launch_uri(&ticket, id, job),
+        (None, None) => launch_app_uri(&ticket),
     };
     Command::new(paths::process()).arg(uri).spawn().map_err(|e| e.to_string())?;
     with(|l| {
@@ -481,7 +547,154 @@ pub fn launch(user_id: u64, place: &str, job: &str) -> Result<(), String> {
         let mut s = app::settings();
         s.prop.account_place = place.trim().to_string();
         s.prop.account_job = job.to_string();
+        s.prop.account_follow = follow.to_string();
         s.save();
     }
     Ok(())
+}
+
+// ------------------------------------------------------------------ groups
+
+/// A named set of saved accounts. Launching a group starts Roblox for every account in it.
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(default)]
+pub struct Group {
+    /// Small number (1, 2, 3...), so the web page can hold it without rounding.
+    pub id: u64,
+    pub name: String,
+    /// `user_id` of each member account, in launch order.
+    pub members: Vec<u64>,
+    /// Optional game for this group: a Place ID or game link, a server ID, a player to follow.
+    /// All three empty = use the game settings of the Multi Account page.
+    pub place: String,
+    pub job: String,
+    pub follow: String,
+}
+
+static GROUPS: Mutex<Option<Vec<Group>>> = Mutex::new(None);
+
+/// Seconds between two accounts of a group. Roblox needs a moment to open its window and take the
+/// multi-window mutex before the next one starts.
+const GROUP_GAP_SECS: u64 = 6;
+const GROUP_NAME_MAX: usize = 40;
+
+fn groups_file() -> PathBuf {
+    paths::get().base.join("AccountGroups.json")
+}
+
+fn with_groups<R>(f: impl FnOnce(&mut Vec<Group>) -> R) -> R {
+    let mut g = GROUPS.lock().unwrap_or_else(|e| e.into_inner());
+    if g.is_none() {
+        let list: Vec<Group> = fs::read_to_string(groups_file()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        *g = Some(list);
+    }
+    f(g.as_mut().unwrap())
+}
+
+fn persist_groups(list: &[Group]) {
+    let _ = fs::create_dir_all(&paths::get().base);
+    if let Ok(s) = serde_json::to_string_pretty(list) {
+        let _ = fs::write(groups_file(), s);
+    }
+}
+
+fn group_to_json(g: &Group) -> Value {
+    json!({"id": g.id, "name": g.name, "members": g.members, "place": g.place, "job": g.job, "follow": g.follow})
+}
+
+pub fn groups_json() -> Value {
+    with_groups(|l| Value::Array(l.iter().map(group_to_json).collect()))
+}
+
+/// Creates a group (`id` 0) or changes one. Members that are not saved accounts are dropped.
+pub fn group_save(id: u64, name: &str, members: &[u64], place: &str, job: &str, follow: &str) -> Result<Value, String> {
+    let (place, job, follow) = (place.trim().to_string(), job.trim().to_string(), follow.trim().to_string());
+    if follow.is_empty() && !place.is_empty() && parse_place(&place).is_none() {
+        return Err(pick("That Place ID or game link looks wrong.", "Place ID atau link game sepertinya salah."));
+    }
+    if follow.is_empty() && !job.is_empty() && !job.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+        return Err(pick("The server ID looks wrong.", "Server ID sepertinya salah."));
+    }
+    let name: String = name.trim().chars().take(GROUP_NAME_MAX).collect();
+    if name.is_empty() {
+        return Err(pick("Give the group a name.", "Beri nama untuk group."));
+    }
+    let known: Vec<u64> = with(|l| l.iter().map(|a| a.user_id).collect());
+    let mut kept: Vec<u64> = Vec::new();
+    for m in members {
+        if known.contains(m) && !kept.contains(m) {
+            kept.push(*m);
+        }
+    }
+    if kept.is_empty() {
+        return Err(pick("Pick at least one account.", "Pilih minimal satu akun."));
+    }
+    with_groups(|l| {
+        if l.iter().any(|g| g.id != id && g.name.to_lowercase() == name.to_lowercase()) {
+            return Err(pick("A group with this name already exists.", "Group dengan nama ini sudah ada."));
+        }
+        let out = if id == 0 {
+            let next = l.iter().map(|g| g.id).max().unwrap_or(0) + 1;
+            let g = Group { id: next, name, members: kept, place, job, follow };
+            l.push(g.clone());
+            g
+        } else {
+            match l.iter_mut().find(|g| g.id == id) {
+                Some(g) => {
+                    g.name = name;
+                    g.members = kept;
+                    g.place = place;
+                    g.job = job;
+                    g.follow = follow;
+                    g.clone()
+                }
+                None => return Err(pick("That group is gone.", "Group itu sudah tidak ada.")),
+            }
+        };
+        persist_groups(l);
+        Ok(group_to_json(&out))
+    })
+}
+
+pub fn group_remove(id: u64) {
+    with_groups(|l| {
+        l.retain(|g| g.id != id);
+        persist_groups(l);
+    });
+}
+
+/// Starts Roblox for every account in the group, one after the other (`GROUP_GAP_SECS` apart), with the
+/// same game settings as a single launch. The accounts start in the background, so this returns at
+/// once with the number of accounts that will start. An account that fails is written to the log and
+/// the rest still start.
+pub fn group_launch(id: u64, place: &str, job: &str, follow: &str) -> Result<usize, String> {
+    let group = with_groups(|l| l.iter().find(|g| g.id == id).cloned())
+        .ok_or_else(|| pick("That group is gone.", "Group itu sudah tidak ada."))?;
+    let ids: Vec<u64> = with(|l| group.members.iter().copied().filter(|m| l.iter().any(|a| a.user_id == *m)).collect());
+    if ids.is_empty() {
+        return Err(pick("This group has no accounts.", "Group ini belum punya akun."));
+    }
+    // the group's own game wins; with none set, the game settings of the page are used
+    let own = !(group.place.trim().is_empty() && group.job.trim().is_empty() && group.follow.trim().is_empty());
+    let (place, job, follow) = if own {
+        (group.place.clone(), group.job.clone(), group.follow.clone())
+    } else {
+        (place.to_string(), job.to_string(), follow.to_string())
+    };
+    // catch an obviously wrong game before anything starts
+    if follow.trim().is_empty() && !place.trim().is_empty() && parse_place(&place).is_none() {
+        return Err(pick("That Place ID or game link looks wrong.", "Place ID atau link game sepertinya salah."));
+    }
+    let count = ids.len();
+    std::thread::spawn(move || {
+        for (i, uid) in ids.into_iter().enumerate() {
+            if i > 0 {
+                std::thread::sleep(std::time::Duration::from_secs(GROUP_GAP_SECS));
+            }
+            if let Err(e) = launch(uid, &place, &job, &follow) {
+                crate::log!("Accounts::Group", "Account {uid} in group '{}' did not start: {e}", group.name);
+            }
+        }
+    });
+    Ok(count)
 }

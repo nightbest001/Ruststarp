@@ -24,6 +24,7 @@ Bukan produk resmi Roblox.
 | Halaman Appearance | tema, bootstrapper, ikon | tema (sistem/terang/gelap) dan judul bootstrapper |
 | Export diagnostic data | ada | ada |
 | Multi Account (beberapa akun, beberapa jendela Roblox) | tidak ada | ada: halaman Multi Account |
+| Susun jendela Roblox jadi kotak rapi di layar | tidak ada | ada: Multi Account > Tata letak jendela, atau menu tray |
 | Tetap di System Tray setelah Roblox jalan | tidak ada | ada (bisa dimatikan di Behaviour) |
 | Overlay CPU / GPU / RAM di atas game (latar transparan) | tidak ada | ada: Pengaturan > Integrasi |
 | Update diri sendiri | ada | ada: banner di dalam app, tanpa unduh lewat browser |
@@ -46,6 +47,54 @@ di System Tray (menu: buka Ruststrap, Multi Account, tutup semua jendela Roblox,
 memegang mutex Roblox, jadi beberapa akun bisa main bersamaan. Matikan lewat **Behaviour** (tray) atau
 **Multi Account** (beberapa jendela). Untuk beberapa jendela, jalankan akun pertama lewat Ruststrap
 (bukan lewat Roblox yang sudah terbuka lebih dulu).
+
+## Group akun
+
+Di halaman **Multi Account**, bagian **Group**: kumpulkan beberapa akun dalam satu group yang punya nama
+(misalnya "Tim Farm"). Tombol **Group baru** minta nama dan akun mana saja yang masuk. Tombol **Jalankan semua**
+membuka Roblox untuk setiap akun di group, jadi tidak perlu menjalankan satu per satu.
+
+- Akun dibuka bergantian, selang 6 detik (`GROUP_GAP_SECS` di `src/accounts.rs`), supaya tiap jendela sempat terbuka.
+- Tiap group bisa punya game sendiri (opsional): Place ID atau link game, teman yang diikuti, dan Server ID. Kalau ketiganya kosong, group memakai pengaturan **Game** di halaman Multi Account. Ikut pemain lebih diutamakan daripada Place ID.
+- Kalau satu akun gagal (cookie kedaluwarsa), akun lain tetap jalan. Penyebabnya ditulis di log (`Accounts::Group`).
+- Group disimpan di `AccountGroups.json`. Hapus akun otomatis mengeluarkannya dari semua group.
+
+## Susun jendela Roblox
+
+Di halaman **Multi Account**, bagian **Tata letak jendela**:
+
+- **Susun sekarang** menyusun semua jendela Roblox yang terbuka menjadi kotak di layar (area kerja, tanpa taskbar).
+  Jendela pertama yang dibuka ada di kiri atas.
+- **Kolom** (otomatis atau 1 sampai 6), **Jarak antar jendela** (0, 4, 8, 16 px), dan **Jendela tanpa bingkai**.
+- **Susun otomatis**: tersusun lagi tiap ada jendela Roblox yang dibuka atau ditutup. Jalan di proses tray,
+  jadi Ruststrap harus tetap di System Tray.
+- Menu tray juga punya **Susun jendela Roblox**.
+
+## Anti-AFK
+
+Di halaman **Multi Account**: tiap beberapa menit (5 sampai 18), setiap jendela Roblox yang tidak di depan maju sebentar,
+menerima satu input kecil, lalu jendelamu dikembalikan. Jendela yang diminimalkan diminimalkan lagi. Pilihan aksi:
+**Geser mouse** (disarankan, tidak menyentuh karakter, jadi auto-farm tetap jalan), **Lompat** (Space), atau
+**Zoom kamera** (I lalu O). Kalau kamu sedang mengetik atau menggerakkan mouse, ia menunggu jeda (paling lama 3 menit).
+Jalan di proses tray.
+
+## Max alts
+
+Di halaman **Multi Account**: jendela Roblox yang tidak kamu mainkan dibuat ringan. Jendela paling depan tetap penuh
+(dengan prioritas dari **Process priority**). Jendela Roblox lain dapat prioritas CPU Idle dan mode hemat
+(efficiency mode) Windows. Pilihan **Pangkas RAM jendela latar** juga mengambil memori yang tidak terpakai tiap 20 detik.
+Kalau tidak ada jendela Roblox di depan (kamu di browser), semua jendela dianggap latar.
+Jalan di proses tray, dan semuanya kembali normal saat dimatikan atau saat tray ditutup.
+Hanya kontrol proses biasa Windows yang dipakai (seperti di Task Manager), tanpa admin.
+
+## Ikut pemain
+
+Di halaman **Multi Account**, kolom **Ikut pemain**: isi username Roblox (atau link `roblox.com/users/...`).
+Tombol **Luncurkan** lalu memasukkan akun ke server tempat pemain itu berada, dan Place ID serta ID server diabaikan.
+Pemain harus online dan mengizinkan kamu bergabung (biasanya harus berteman). Pakai di beberapa akun untuk membawa
+semuanya ke server yang sama. Kosongkan kolom untuk kembali ke cara biasa.
+
+Roblox harus dalam mode jendela. Mode layar penuh (F11) bisa melawan pergeseran jendela.
 
 ## Cara pakai
 

@@ -56,7 +56,7 @@ function UpdateBar(o){
 
 /* =========================================================== SETTINGS */
 function Settings(prev){
-  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null,acc:(D.accounts||[]).slice(),place:(D.account_last&&D.account_last.place)||'',job:(D.account_last&&D.account_last.job)||''};
+  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null,acc:(D.accounts||[]).slice(),groups:(D.groups||[]).slice(),place:(D.account_last&&D.account_last.place)||'',job:(D.account_last&&D.account_last.job)||'',follow:(D.account_last&&D.account_last.follow)||''};
   const snap=()=>JSON.stringify([S.s,S.force,S.flags,S.sc]);let saved=prev?prev.saved:snap();
   const dirty=()=>snap()!==saved;
   let page=prev?prev.page:(['accounts','behaviour','mods','fastflags','appearance','shortcuts','gpu','memory','ruststrap','about'].includes(D.start_page)?D.start_page:'integrations');let crumbs=[];
@@ -157,13 +157,40 @@ function Settings(prev){
       const avatar=a=>a.avatar?h('img',{class:'av',src:a.avatar,alt:'',referrerpolicy:'no-referrer'}):h('div',{class:'av ph'},(a.display_name||a.username||'?').slice(0,1).toUpperCase());
       async function launch(a){
         if(dirty()&&!(await save()))return;
-        try{await call('account_launch',{user_id:a.user_id,place:S.place,job:S.job});
+        try{await call('account_launch',{user_id:a.user_id,place:S.place,job:S.job,follow:S.follow});
           snack({title:t('X.Acc.Launching',a.display_name||a.username),kind:'ok',icon:'CheckmarkCircle32'})}
         catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:7000})}}
       async function remove(a){
         if(!(await confirmBox(t('X.Acc.Remove'),t('X.Acc.Remove.Confirm',a.display_name||a.username),t('X.Acc.Remove'),t('Common.Cancel'))))return;
-        try{await call('account_remove',{user_id:a.user_id});S.acc=S.acc.filter(x=>x.user_id!==a.user_id);paint()}
+        try{await call('account_remove',{user_id:a.user_id});S.acc=S.acc.filter(x=>x.user_id!==a.user_id);S.groups=(await call('groups_list'))||S.groups;paint();paintG()}
         catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      async function arrange(){
+        if(dirty()&&!(await save()))return;
+        try{const n=await call('layout_arrange');
+          snack({title:t('X.Layout.Done',n),kind:'ok',icon:'CheckmarkCircle32'})}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      const glist=h('div');
+      async function launchGroup(g){
+        if(dirty()&&!(await save()))return;
+        try{const n=await call('group_launch',{id:g.id,place:S.place,job:S.job,follow:S.follow});
+          snack({title:t('X.Grp.Launching',g.name,n),msg:n>1?t('X.Grp.Launching.Msg'):null,kind:'ok',icon:'CheckmarkCircle32'})}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:7000})}}
+      async function removeGroup(g){
+        if(!(await confirmBox(t('X.Grp.Remove'),t('X.Grp.Remove.Confirm',g.name),t('X.Grp.Remove'),t('Common.Cancel'))))return;
+        try{await call('group_remove',{id:g.id});S.groups=S.groups.filter(x=>x.id!==g.id);paintG()}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      const paintG=()=>{
+        glist.innerHTML='';
+        if(!S.groups.length){glist.append(Card(h('span',{class:'t2'},t('X.Grp.None'))));return}
+        S.groups.forEach(g=>{
+          const names=g.members.map(id=>{const a=S.acc.find(x=>x.user_id===id);return a?(a.display_name||a.username):null}).filter(Boolean);
+          const go=Btn(t('X.Grp.Launch'),{kind:'primary',icon:'Play28',onclick:()=>launchGroup(g)});
+          if(!names.length){go.disabled=true;go.classList.add('dis')}
+          glist.append(h('div',{class:'card acc-row'},h('div',{class:'av ph'},(g.name||'?').slice(0,1).toUpperCase()),
+            h('div',{class:'tx'},h('div',{class:'tt'},g.name),h('div',{class:'ds'},t('X.Grp.Count',names.length)+(names.length?' \u00b7 '+names.join(', '):'')+(g.follow?' \u00b7 '+t('X.Grp.Tag.Follow',g.follow):(g.place?' \u00b7 '+t('X.Grp.Tag.Place',g.place):'')))),
+            go,
+            Btn(null,{icon:'Edit28',onclick:()=>editGroup(g,paintG)}),
+            Btn(null,{icon:'Delete20',onclick:()=>removeGroup(g)})))})};
       const paint=()=>{
         list.innerHTML='';
         if(!S.acc.length){list.append(Card(h('span',{class:'t2'},t('X.Acc.None'))));return}
@@ -177,12 +204,28 @@ function Settings(prev){
       const field=(get,set,ph)=>h('div',{style:{width:'260px'}},Text(get,set,{placeholder:ph}));
       const el=pg(dsc('X.Acc.Description'),
         h('div',{class:'btnrow',style:{margin:'0 0 8px'}},Btn(t('X.Acc.Add'),{kind:'primary',icon:'Add20',onclick:()=>addAccount(paint)})),
-        list,sec('X.Acc.Game'),
+        list,sec('X.Grp.Section'),dsc('X.Grp.Description'),
+        h('div',{class:'btnrow',style:{margin:'0 0 8px'}},Btn(t('X.Grp.New'),{kind:'primary',icon:'Add20',onclick:()=>{
+          if(!S.acc.length){snack({title:t('X.Grp.NeedAcc'),kind:'bad',icon:'Warning28',timeout:4000});return}
+          editGroup(null,paintG)}})),
+        glist,sec('X.Acc.Game'),
+        Option({header:t('X.Acc.Follow'),desc:t('X.Acc.Follow.Desc'),content:field(()=>S.follow,v=>S.follow=v,'username')}),
         Option({header:t('X.Acc.Place'),desc:t('X.Acc.Place.Desc'),content:field(()=>S.place,v=>S.place=v,'https://www.roblox.com/games/...')}),
         Option({header:t('X.Acc.Job'),desc:t('X.Acc.Job.Desc'),content:field(()=>S.job,v=>S.job=v,'')}),
         sec('X.Acc.Windows'),
-        Option({header:t('X.Acc.Multi.Title'),desc:t('X.Acc.Multi.Desc'),content:Toggle(()=>S.s.multi_instance,v=>S.s.multi_instance=v)}));
-      paint();return el},
+        Option({header:t('X.Acc.Multi.Title'),desc:t('X.Acc.Multi.Desc'),content:Toggle(()=>S.s.multi_instance,v=>S.s.multi_instance=v)}),
+        Option({header:t('X.MaxAlts.Title'),desc:t('X.MaxAlts.Desc'),content:Toggle(()=>S.s.max_alts,v=>S.s.max_alts=v)}),
+        Option({header:t('X.MaxAlts.Trim.Title'),desc:t('X.MaxAlts.Trim.Desc'),enabled:()=>S.s.max_alts,content:Toggle(()=>S.s.max_alts_trim,v=>S.s.max_alts_trim=v)}),
+        Option({header:t('X.Afk.Title'),desc:t('X.Afk.Desc'),content:Toggle(()=>S.s.anti_afk,v=>S.s.anti_afk=v)}),
+        Option({header:t('X.Afk.Every.Title'),desc:t('X.Afk.Every.Desc'),enabled:()=>S.s.anti_afk,content:Combo([5,10,12,15,18].map(n=>({v:String(n),label:t('X.Afk.Minutes',n)})),()=>String(S.s.anti_afk_minutes||12),v=>S.s.anti_afk_minutes=parseInt(v,10)||12,160)}),
+        Option({header:t('X.Afk.Action.Title'),desc:t('X.Afk.Action.Desc'),enabled:()=>S.s.anti_afk,content:Combo([{v:'nudge',label:t('X.Afk.Nudge')},{v:'space',label:t('X.Afk.Space')},{v:'zoom',label:t('X.Afk.Zoom')}],()=>S.s.anti_afk_action||'nudge',v=>S.s.anti_afk_action=v,240)}),
+        sec('X.Layout.Section'),
+        Option({header:t('X.Layout.Arrange.Title'),desc:t('X.Layout.Arrange.Desc'),content:Btn(t('X.Layout.Arrange.Btn'),{kind:'primary',icon:'Apps28',onclick:arrange})}),
+        Option({header:t('X.Layout.Columns.Title'),desc:t('X.Layout.Columns.Desc'),content:Combo([{v:'0',label:t('Common.Automatic')}].concat([1,2,3,4,5,6].map(n=>({v:String(n),label:String(n)}))),()=>String(S.s.layout_columns||0),v=>S.s.layout_columns=parseInt(v,10)||0,140)}),
+        Option({header:t('X.Layout.Gap.Title'),desc:t('X.Layout.Gap.Desc'),content:Combo([0,4,8,16].map(n=>({v:String(n),label:t('X.Layout.Px',n)})),()=>String(S.s.layout_gap||0),v=>S.s.layout_gap=parseInt(v,10)||0,140)}),
+        Option({header:t('X.Layout.Borderless.Title'),desc:t('X.Layout.Borderless.Desc'),content:Toggle(()=>S.s.layout_borderless,v=>S.s.layout_borderless=v)}),
+        Option({header:t('X.Layout.Auto.Title'),desc:t('X.Layout.Auto.Desc'),content:Toggle(()=>S.s.layout_auto,v=>S.s.layout_auto=v)}));
+      paint();paintG();return el},
 
     behaviour(){return pg(dsc('Menu.Behaviour.Description'),
       Option({header:t('X.Behaviour.Tray.Title'),desc:t('X.Behaviour.Tray.Description'),content:Toggle(()=>S.s.keep_in_tray,v=>S.s.keep_in_tray=v)}),
@@ -335,6 +378,39 @@ function Settings(prev){
 
     about(){return AboutBody()}
   };
+
+  /* Make or change a group: a name and the accounts in it */
+  function editGroup(g,onDone){
+    const f={name:g?g.name:'',sel:new Set(g?g.members:[]),place:g?(g.place||''):'',job:g?(g.job||''):'',follow:g?(g.follow||''):''};
+    let busy=false;
+    const err=h('div',{class:'acc-err'});
+    const close=()=>scrim.remove();
+    const scrim=h('div',{class:'scrim',onmousedown:e=>{if(e.target===scrim&&!busy)close()}});
+    const members=h('div',{class:'grp-list'});
+    S.acc.forEach(a=>members.append(Check((a.display_name||a.username)+' (@'+a.username+')',()=>f.sel.has(a.user_id),v=>{v?f.sel.add(a.user_id):f.sel.delete(a.user_id)})));
+    const lab=k=>h('div',{class:'lbl'},t(k));
+    async function submit(){
+      if(busy)return;
+      if(!f.name.trim()){err.textContent=t('X.Grp.NameEmpty');return}
+      if(!f.sel.size){err.textContent=t('X.Grp.PickOne');return}
+      busy=true;err.textContent='';
+      try{await call('group_save',{id:g?g.id:0,name:f.name,members:S.acc.map(a=>a.user_id).filter(id=>f.sel.has(id)),place:f.place,job:f.job,follow:f.follow});
+        S.groups=(await call('groups_list'))||S.groups;close();if(onDone)onDone()}
+      catch(e){busy=false;err.textContent=String(e)}}
+    scrim.append(h('div',{class:'dlg acc',role:'dialog'},
+      h('div',{class:'acc-h'},h('div',null,h('div',{class:'dh'},t(g?'X.Grp.Edit':'X.Grp.New')),h('div',{class:'sub'},t('X.Grp.Sub'))),
+        h('div',{class:'x',onclick:()=>{if(!busy)close()}},icon('Dismiss20'))),
+      h('div',{class:'acc-b'},
+        lab('X.Grp.Name'),Text(()=>f.name,v=>f.name=v,{placeholder:t('X.Grp.Name.Ph')}),
+        h('div',{style:{height:'14px'}}),lab('X.Grp.Members'),members,
+        h('div',{style:{height:'14px'}}),lab('X.Grp.Game'),h('div',{class:'acc-p',style:{margin:'0 0 8px',fontSize:'12px'}},t('X.Grp.Game.Desc')),
+        lab('X.Grp.Place'),Text(()=>f.place,v=>f.place=v,{placeholder:'123456789 / https://www.roblox.com/games/...'}),
+        h('div',{style:{height:'10px'}}),lab('X.Grp.Follow'),Text(()=>f.follow,v=>f.follow=v,{placeholder:'username'}),
+        h('div',{style:{height:'10px'}}),lab('X.Grp.Job'),Text(()=>f.job,v=>f.job=v,{placeholder:''}),
+        h('div',{style:{height:'12px'}}),err,
+        h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},Btn(t('Common.Cancel'),{onclick:()=>{if(!busy)close()}}),Btn(t('X.Grp.Save'),{kind:'primary',onclick:submit})))));
+    document.body.append(scrim);
+    setTimeout(()=>{const i=scrim.querySelector('input');if(i&&!g)i.focus()},30)}
 
   /* Add an account: three ways in (Roblox window, password, pasted cookie) */
   function addAccount(onDone){
