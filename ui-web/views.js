@@ -14,20 +14,23 @@ function UpdateBar(o){
   const el=h('div',{class:'upd'});el.style.display='none';
   const S={busy:false};
   const title=h('div',{class:'tt'});const sub=h('div',{class:'ds'});
-  const pbv=h('div',{class:'v'});const pb=h('div',{class:'pb',style:{display:'none',marginTop:'8px'}},pbv);
+  const dp=DotProgress({cols:36,rows:2,size:4,gap:5});const pb=h('div',{style:{display:'none',marginTop:'8px'}},dp);
+  const sp={t:0,d:0,v:0};
+  /* download speed in Mbps, measured over about one second */
+  function speed(done){const now=performance.now();if(!sp.t){sp.t=now;sp.d=done;return sp.v}const dt=(now-sp.t)/1000;if(dt>=1){sp.v=Math.max(0,(done-sp.d)*8/1e6/dt);sp.t=now;sp.d=done}return sp.v}
   const go=Btn('',{kind:'primary',icon:'ArrowDownload16',onclick:()=>run()});
   const later=Btn(t('X.Upd.Later'),{onclick:()=>hide()});
   const label=txt=>{go.querySelector('span').textContent=txt};
   const show=()=>{el.style.display='';if(D.mode==='home')call('win',{op:'banner',on:true})};
   function hide(){el.style.display='none';if(D.mode==='home')call('win',{op:'banner',on:false})}
   function fail(e){S.busy=false;go.disabled=false;go.classList.remove('dis');later.style.display='';
-    pb.classList.remove('ind');pb.classList.add('err');pbv.style.width='100%';
+    dp.set(1);dp.fail(true);
     title.textContent=t('X.Upd.Failed');sub.textContent=String(e||t('X.Upd.Unknown'));label(t('X.Upd.Retry'))}
   async function run(){
     if(S.busy)return;
     if(o.beforeRun&&!(await o.beforeRun()))return;
     S.busy=true;go.disabled=true;go.classList.add('dis');later.style.display='none';
-    pb.style.display='';pb.classList.remove('err');pb.classList.add('ind');
+    pb.style.display='';dp.fail(false);dp.set(null);sp.t=0;sp.v=0;
     title.textContent=t('X.Upd.Updating',NAME);sub.textContent=t('X.Upd.Starting');
     try{await call('start_update')}catch(e){return fail(e)}
     poll()}
@@ -36,9 +39,9 @@ function UpdateBar(o){
     if(!p)return setTimeout(poll,150);
     if(p.phase==='failed')return fail(p.error);
     if(p.phase==='downloading'){
-      if(p.total){pb.classList.remove('ind');pbv.style.width=Math.min(100,p.done*100/p.total)+'%'}
-      sub.textContent=p.total?t('X.Upd.DownloadingOf',mb(p.done),mb(p.total)):t('X.Upd.Downloading',mb(p.done))}
-    else{pb.classList.add('ind');sub.textContent=p.phase==='done'?t('X.Upd.Restarting'):t('X.Upd.Installing')}
+      if(p.total)dp.set(p.done/p.total);else dp.set(null);
+      {const v=speed(p.done);sub.textContent=(p.total?t('X.Upd.DownloadingOf',mb(p.done),mb(p.total)):t('X.Upd.Downloading',mb(p.done)))+(v>0?'  @ '+v.toFixed(1)+' Mbps':'')}}
+    else{dp.set(null);sub.textContent=p.phase==='done'?t('X.Upd.Restarting'):t('X.Upd.Installing')}
     setTimeout(poll,150)}
   /* manual=true: tell the user when there is nothing new or the check failed */
   el.check=async function(manual){
@@ -56,7 +59,7 @@ function UpdateBar(o){
 
 /* =========================================================== SETTINGS */
 function Settings(prev){
-  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null,acc:(D.accounts||[]).slice(),place:(D.account_last&&D.account_last.place)||'',job:(D.account_last&&D.account_last.job)||''};
+  const S=prev?prev.S:{s:D.settings,force:D.force_reinstall,flags:D.flags,sc:D.shortcuts.slice(),sel:-1,showPreset:false,filter:'',selFlag:null,acc:(D.accounts||[]).slice(),groups:(D.groups||[]).slice(),place:(D.account_last&&D.account_last.place)||'',job:(D.account_last&&D.account_last.job)||'',follow:(D.account_last&&D.account_last.follow)||''};
   const snap=()=>JSON.stringify([S.s,S.force,S.flags,S.sc]);let saved=prev?prev.saved:snap();
   const dirty=()=>snap()!==saved;
   let page=prev?prev.page:(['accounts','behaviour','mods','fastflags','appearance','shortcuts','gpu','memory','ruststrap','about'].includes(D.start_page)?D.start_page:'integrations');let crumbs=[];
@@ -157,13 +160,40 @@ function Settings(prev){
       const avatar=a=>a.avatar?h('img',{class:'av',src:a.avatar,alt:'',referrerpolicy:'no-referrer'}):h('div',{class:'av ph'},(a.display_name||a.username||'?').slice(0,1).toUpperCase());
       async function launch(a){
         if(dirty()&&!(await save()))return;
-        try{await call('account_launch',{user_id:a.user_id,place:S.place,job:S.job});
+        try{await call('account_launch',{user_id:a.user_id,place:S.place,job:S.job,follow:S.follow});
           snack({title:t('X.Acc.Launching',a.display_name||a.username),kind:'ok',icon:'CheckmarkCircle32'})}
         catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:7000})}}
       async function remove(a){
         if(!(await confirmBox(t('X.Acc.Remove'),t('X.Acc.Remove.Confirm',a.display_name||a.username),t('X.Acc.Remove'),t('Common.Cancel'))))return;
-        try{await call('account_remove',{user_id:a.user_id});S.acc=S.acc.filter(x=>x.user_id!==a.user_id);paint()}
+        try{await call('account_remove',{user_id:a.user_id});S.acc=S.acc.filter(x=>x.user_id!==a.user_id);S.groups=(await call('groups_list'))||S.groups;paint();paintG()}
         catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      async function arrange(){
+        if(dirty()&&!(await save()))return;
+        try{const n=await call('layout_arrange');
+          snack({title:t('X.Layout.Done',n),kind:'ok',icon:'CheckmarkCircle32'})}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      const glist=h('div');
+      async function launchGroup(g){
+        if(dirty()&&!(await save()))return;
+        try{const n=await call('group_launch',{id:g.id,place:S.place,job:S.job,follow:S.follow});
+          snack({title:t('X.Grp.Launching',g.name,n),msg:n>1?t('X.Grp.Launching.Msg'):null,kind:'ok',icon:'CheckmarkCircle32'})}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:7000})}}
+      async function removeGroup(g){
+        if(!(await confirmBox(t('X.Grp.Remove'),t('X.Grp.Remove.Confirm',g.name),t('X.Grp.Remove'),t('Common.Cancel'))))return;
+        try{await call('group_remove',{id:g.id});S.groups=S.groups.filter(x=>x.id!==g.id);paintG()}
+        catch(e){snack({title:t('X.Error'),msg:String(e),kind:'bad',timeout:6000})}}
+      const paintG=()=>{
+        glist.innerHTML='';
+        if(!S.groups.length){glist.append(Card(h('span',{class:'t2'},t('X.Grp.None'))));return}
+        S.groups.forEach(g=>{
+          const names=g.members.map(id=>{const a=S.acc.find(x=>x.user_id===id);return a?(a.display_name||a.username):null}).filter(Boolean);
+          const go=Btn(t('X.Grp.Launch'),{kind:'primary',icon:'Play28',onclick:()=>launchGroup(g)});
+          if(!names.length){go.disabled=true;go.classList.add('dis')}
+          glist.append(h('div',{class:'card acc-row'},h('div',{class:'av ph'},(g.name||'?').slice(0,1).toUpperCase()),
+            h('div',{class:'tx'},h('div',{class:'tt'},g.name),h('div',{class:'ds'},t('X.Grp.Count',names.length)+(names.length?' \u00b7 '+names.join(', '):'')+(g.follow?' \u00b7 '+t('X.Grp.Tag.Follow',g.follow):(g.place?' \u00b7 '+t('X.Grp.Tag.Place',g.place):'')))),
+            go,
+            Btn(null,{icon:'Edit28',onclick:()=>editGroup(g,paintG)}),
+            Btn(null,{icon:'Delete20',onclick:()=>removeGroup(g)})))})};
       const paint=()=>{
         list.innerHTML='';
         if(!S.acc.length){list.append(Card(h('span',{class:'t2'},t('X.Acc.None'))));return}
@@ -177,12 +207,28 @@ function Settings(prev){
       const field=(get,set,ph)=>h('div',{style:{width:'260px'}},Text(get,set,{placeholder:ph}));
       const el=pg(dsc('X.Acc.Description'),
         h('div',{class:'btnrow',style:{margin:'0 0 8px'}},Btn(t('X.Acc.Add'),{kind:'primary',icon:'Add20',onclick:()=>addAccount(paint)})),
-        list,sec('X.Acc.Game'),
+        list,sec('X.Grp.Section'),dsc('X.Grp.Description'),
+        h('div',{class:'btnrow',style:{margin:'0 0 8px'}},Btn(t('X.Grp.New'),{kind:'primary',icon:'Add20',onclick:()=>{
+          if(!S.acc.length){snack({title:t('X.Grp.NeedAcc'),kind:'bad',icon:'Warning28',timeout:4000});return}
+          editGroup(null,paintG)}})),
+        glist,sec('X.Acc.Game'),
+        Option({header:t('X.Acc.Follow'),desc:t('X.Acc.Follow.Desc'),content:field(()=>S.follow,v=>S.follow=v,'username')}),
         Option({header:t('X.Acc.Place'),desc:t('X.Acc.Place.Desc'),content:field(()=>S.place,v=>S.place=v,'https://www.roblox.com/games/...')}),
         Option({header:t('X.Acc.Job'),desc:t('X.Acc.Job.Desc'),content:field(()=>S.job,v=>S.job=v,'')}),
         sec('X.Acc.Windows'),
-        Option({header:t('X.Acc.Multi.Title'),desc:t('X.Acc.Multi.Desc'),content:Toggle(()=>S.s.multi_instance,v=>S.s.multi_instance=v)}));
-      paint();return el},
+        Option({header:t('X.Acc.Multi.Title'),desc:t('X.Acc.Multi.Desc'),content:Toggle(()=>S.s.multi_instance,v=>S.s.multi_instance=v)}),
+        Option({header:t('X.MaxAlts.Title'),desc:t('X.MaxAlts.Desc'),content:Toggle(()=>S.s.max_alts,v=>S.s.max_alts=v)}),
+        Option({header:t('X.MaxAlts.Trim.Title'),desc:t('X.MaxAlts.Trim.Desc'),enabled:()=>S.s.max_alts,content:Toggle(()=>S.s.max_alts_trim,v=>S.s.max_alts_trim=v)}),
+        Option({header:t('X.Afk.Title'),desc:t('X.Afk.Desc'),content:Toggle(()=>S.s.anti_afk,v=>S.s.anti_afk=v)}),
+        Option({header:t('X.Afk.Every.Title'),desc:t('X.Afk.Every.Desc'),enabled:()=>S.s.anti_afk,content:Combo([5,10,12,15,18].map(n=>({v:String(n),label:t('X.Afk.Minutes',n)})),()=>String(S.s.anti_afk_minutes||12),v=>S.s.anti_afk_minutes=parseInt(v,10)||12,160)}),
+        Option({header:t('X.Afk.Action.Title'),desc:t('X.Afk.Action.Desc'),enabled:()=>S.s.anti_afk,content:Combo([{v:'nudge',label:t('X.Afk.Nudge')},{v:'space',label:t('X.Afk.Space')},{v:'zoom',label:t('X.Afk.Zoom')}],()=>S.s.anti_afk_action||'nudge',v=>S.s.anti_afk_action=v,240)}),
+        sec('X.Layout.Section'),
+        Option({header:t('X.Layout.Arrange.Title'),desc:t('X.Layout.Arrange.Desc'),content:Btn(t('X.Layout.Arrange.Btn'),{kind:'primary',icon:'Apps28',onclick:arrange})}),
+        Option({header:t('X.Layout.Columns.Title'),desc:t('X.Layout.Columns.Desc'),content:Combo([{v:'0',label:t('Common.Automatic')}].concat([1,2,3,4,5,6].map(n=>({v:String(n),label:String(n)}))),()=>String(S.s.layout_columns||0),v=>S.s.layout_columns=parseInt(v,10)||0,140)}),
+        Option({header:t('X.Layout.Gap.Title'),desc:t('X.Layout.Gap.Desc'),content:Combo([0,4,8,16].map(n=>({v:String(n),label:t('X.Layout.Px',n)})),()=>String(S.s.layout_gap||0),v=>S.s.layout_gap=parseInt(v,10)||0,140)}),
+        Option({header:t('X.Layout.Borderless.Title'),desc:t('X.Layout.Borderless.Desc'),content:Toggle(()=>S.s.layout_borderless,v=>S.s.layout_borderless=v)}),
+        Option({header:t('X.Layout.Auto.Title'),desc:t('X.Layout.Auto.Desc'),content:Toggle(()=>S.s.layout_auto,v=>S.s.layout_auto=v)}));
+      paint();paintG();return el},
 
     behaviour(){return pg(dsc('Menu.Behaviour.Description'),
       Option({header:t('X.Behaviour.Tray.Title'),desc:t('X.Behaviour.Tray.Description'),content:Toggle(()=>S.s.keep_in_tray,v=>S.s.keep_in_tray=v)}),
@@ -336,6 +382,39 @@ function Settings(prev){
     about(){return AboutBody()}
   };
 
+  /* Make or change a group: a name and the accounts in it */
+  function editGroup(g,onDone){
+    const f={name:g?g.name:'',sel:new Set(g?g.members:[]),place:g?(g.place||''):'',job:g?(g.job||''):'',follow:g?(g.follow||''):''};
+    let busy=false;
+    const err=h('div',{class:'acc-err'});
+    const close=()=>scrim.remove();
+    const scrim=h('div',{class:'scrim',onmousedown:e=>{if(e.target===scrim&&!busy)close()}});
+    const members=h('div',{class:'grp-list'});
+    S.acc.forEach(a=>members.append(Check((a.display_name||a.username)+' (@'+a.username+')',()=>f.sel.has(a.user_id),v=>{v?f.sel.add(a.user_id):f.sel.delete(a.user_id)})));
+    const lab=k=>h('div',{class:'lbl'},t(k));
+    async function submit(){
+      if(busy)return;
+      if(!f.name.trim()){err.textContent=t('X.Grp.NameEmpty');return}
+      if(!f.sel.size){err.textContent=t('X.Grp.PickOne');return}
+      busy=true;err.textContent='';
+      try{await call('group_save',{id:g?g.id:0,name:f.name,members:S.acc.map(a=>a.user_id).filter(id=>f.sel.has(id)),place:f.place,job:f.job,follow:f.follow});
+        S.groups=(await call('groups_list'))||S.groups;close();if(onDone)onDone()}
+      catch(e){busy=false;err.textContent=String(e)}}
+    scrim.append(h('div',{class:'dlg acc',role:'dialog'},
+      h('div',{class:'acc-h'},h('div',null,h('div',{class:'dh'},t(g?'X.Grp.Edit':'X.Grp.New')),h('div',{class:'sub'},t('X.Grp.Sub'))),
+        h('div',{class:'x',onclick:()=>{if(!busy)close()}},icon('Dismiss20'))),
+      h('div',{class:'acc-b'},
+        lab('X.Grp.Name'),Text(()=>f.name,v=>f.name=v,{placeholder:t('X.Grp.Name.Ph')}),
+        h('div',{style:{height:'14px'}}),lab('X.Grp.Members'),members,
+        h('div',{style:{height:'14px'}}),lab('X.Grp.Game'),h('div',{class:'acc-p',style:{margin:'0 0 8px',fontSize:'12px'}},t('X.Grp.Game.Desc')),
+        lab('X.Grp.Place'),Text(()=>f.place,v=>f.place=v,{placeholder:'123456789 / https://www.roblox.com/games/...'}),
+        h('div',{style:{height:'10px'}}),lab('X.Grp.Follow'),Text(()=>f.follow,v=>f.follow=v,{placeholder:'username'}),
+        h('div',{style:{height:'10px'}}),lab('X.Grp.Job'),Text(()=>f.job,v=>f.job=v,{placeholder:''}),
+        h('div',{style:{height:'12px'}}),err),
+      h('div',{class:'df'},Btn(t('Common.Cancel'),{onclick:()=>{if(!busy)close()}}),Btn(t('X.Grp.Save'),{kind:'primary',onclick:submit}))));
+    document.body.append(scrim);
+    setTimeout(()=>{const i=scrim.querySelector('input');if(i&&!g)i.focus()},30)}
+
   /* Add an account: three ways in (Roblox window, password, pasted cookie) */
   function addAccount(onDone){
     let tab=0,busy=false;const f={user:'',pass:'',cookie:''};
@@ -416,16 +495,16 @@ function AboutBody(){
 
 /* =========================================================== BOOT DIALOG (Fluent) */
 function BootView(o){
-  const msg=h('div',{class:'msg'},o.message||'');const pbv=h('div',{class:'v'});const pb=h('div',{class:'pb ind pbw',style:{marginBottom:'16px'}},pbv);
+  const msg=h('div',{class:'msg'},o.message||'');const dp=DotProgress({cols:24,rows:3,size:8,gap:10});const pb=h('div',{class:'dotw'},dp);
   const cancel=Btn(t('Common.Cancel'),{onclick:o.oncancel});
   const el=h('div',{class:'boot'},h('div',{class:'topbar'}),h('img',{class:'ic',src:window.APP_ICON,alt:''}),h('div',{class:'sp'}),msg,pb,cancel);
   el.set=(s)=>{msg.textContent=s.message;
-    if(s.fraction==null){pb.classList.add('ind');pbv.style.width=''}else{pb.classList.remove('ind');pbv.style.width=(s.fraction*100)+'%'}
-    cancel.disabled=!s.can_cancel;cancel.classList.toggle('dis',!s.can_cancel);pb.classList.toggle('err',!!s.error)};
+    dp.set(s.fraction==null?null:s.fraction);dp.fail(!!s.error);
+    cancel.disabled=!s.can_cancel;cancel.classList.toggle('dis',!s.can_cancel)};
   return el}
 function previewBoot(title){
   const el=BootView({message:t('Bootstrapper.Status.Connecting'),oncancel:()=>{clearInterval(iv);scrim.remove()}});
-  const win=h('div',{class:'win framed',style:{width:'500px',height:'280px',borderRadius:'8px',overflow:'hidden',boxShadow:'0 32px 64px rgba(0,0,0,.37)',animation:'dlgIn .25s cubic-bezier(.1,.9,.2,1)'}},el);
+  const win=h('div',{class:'win framed',style:{width:'500px',height:'320px',borderRadius:'8px',overflow:'hidden',boxShadow:'0 32px 64px rgba(0,0,0,.37)',animation:'dlgIn .25s cubic-bezier(.1,.9,.2,1)'}},el);
   const scrim=h('div',{class:'scrim'},win);document.body.append(scrim);
   const P=k=>t(k).replace('{product}','Roblox');const steps=[[P('Bootstrapper.Status.Connecting'),null],[P('Bootstrapper.Status.Installing'),.2],[P('Bootstrapper.Status.Installing'),.55],[P('Bootstrapper.Status.ApplyingModifications'),.85],[P('Bootstrapper.Status.Starting'),1]];
   let i=0;el.set({message:steps[0][0],fraction:null,can_cancel:true});
@@ -446,7 +525,7 @@ function Launch(){
     const s=await call('progress');if(!s)return setTimeout(poll,100);
     if(s.finished!=null&&s.error){errV.innerHTML='';errV.append(h('div',{class:'topbar'}),h('img',{class:'ic',src:window.APP_ICON,alt:''}),h('div',{class:'sp'}),
       h('div',{class:'msg',style:{color:'var(--crit)'}},t('X.Launch.Wrong')),h('div',{class:'t3',style:{textAlign:'center',fontSize:'12px',marginBottom:'10px',maxHeight:'60px',overflow:'auto'}},s.error),
-      h('div',{class:'pb err pbw',style:{marginBottom:'16px'}},h('div',{class:'v',style:{width:'100%'}})),Btn(t('Common.Close'),{cls:'',onclick:()=>call('win',{op:'close',force:true})}));
+      h('div',{class:'dotw'},DotProgress({cols:24,rows:3,size:8,gap:10}).set(1).fail(true)),Btn(t('Common.Close'),{cls:'',onclick:()=>call('win',{op:'close',force:true})}));
       errV.querySelector('.btn').style.cssText='width:120px;align-self:center';swap(errV);return}
     if(s.finished!=null){call('win',{op:'close',force:true});return}
     view.set(s);setTimeout(poll,60)}
@@ -501,6 +580,7 @@ function Setup(){
     return h('div',{class:'page'},h('div',{style:{fontSize:'20px',fontWeight:600}},t('Installer.Install.Location.Title')),h('div',{style:{fontSize:'14px'}},t('Installer.Install.Location.Text')),
       h('div',{class:'card p12'},h('div',{style:{display:'grid',gridTemplateColumns:'1fr auto auto',gap:'8px'}},loc,Btn(t('Common.Browse'),{icon:'Folder24',onclick:async()=>{const p=await call('browse_folder');if(p){S.loc=p;loc.input.value=p}}}),Btn(t('Common.Reset'),{icon:'ArrowCounterclockwise24',onclick:()=>{S.loc=D.default_location;loc.input.value=S.loc}}))),
       S.err?h('div',{style:{marginTop:'8px',color:'var(--crit)',fontSize:'14px',whiteSpace:'pre-wrap'}},S.err):null,
+      S.busy?h('div',{style:{marginTop:'24px'}},DotProgress({cols:12,rows:6,size:12,gap:18}),h('div',{class:'dots-line'},t('X.Dots.Installing',NAME))):null,
       h('div',{style:{fontSize:'20px',fontWeight:600,marginTop:'16px'}},t('Common.Shortcuts')),h('div',{style:{fontSize:'14px'}},t('Installer.Install.Shortcuts.Description')),
       h('div',{class:'grid2'},Option({header:t('Common.Shortcuts.Desktop'),content:Toggle(()=>S.desktop,v=>S.desktop=v)}),Option({header:t('Common.Shortcuts.StartMenu'),content:Toggle(()=>S.start,v=>S.start=v)})))};
   const done=()=>h('div',{class:'page'},h('div',{style:{fontSize:'14px',marginTop:'8px',lineHeight:1.4,whiteSpace:'pre-wrap'}},t('Installer.Completion.Text')),

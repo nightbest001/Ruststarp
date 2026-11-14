@@ -289,3 +289,20 @@ a.lnk:hover{text-decoration:underline}
 .av.ph{display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--tx2)}
 .chip{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;font-size:11px}.chip:empty{display:none}
 .chip.ok{background:rgba(63,185,80,.18);color:#3fb950}.chip.bad{background:rgba(255,107,107,.18);color:#ff6b6b}
+.grp-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:10px;margin:8px 0;padding:4px 2px}
+.acc-b .lbl{margin-bottom:6px}
+.dlg.acc .acc-h,.dlg.acc .seg,.dlg.acc .df{flex:none}
+.dlg.acc .acc-b{flex:1 1 auto;min-height:0;overflow:auto}
+.grp-list{max-height:150px}
+
+/* ---- dot progress ---- */
+.dots{--dim:color-mix(in srgb,var(--tx) 18%,transparent);--lit:var(--tx);display:grid;grid-template-columns:repeat(var(--cols),var(--ds));gap:var(--dg);width:max-content;max-width:100%}
+.dots .d{display:block;width:var(--ds);height:var(--ds);border-radius:50%;background:var(--dim);transition:background .35s,box-shadow .35s,transform .35s}
+.dots .d.on{background:var(--lit);box-shadow:0 0 calc(var(--ds)*.9) color-mix(in srgb,var(--lit) 35%,transparent)}
+.dots .d.next{animation:dotPulse .9s ease-in-out infinite alternate}
+.dots.ind .d{animation:dotWave 1.5s ease-in-out infinite;animation-delay:var(--w)}
+.dots.err{--lit:var(--crit)}
+@keyframes dotPulse{from{background:var(--dim)}to{background:color-mix(in srgb,var(--lit) 75%,transparent)}}
+@keyframes dotWave{0%,100%{background:var(--dim);box-shadow:none;transform:scale(.8)}50%{background:var(--lit);box-shadow:0 0 calc(var(--ds)*.9) color-mix(in srgb,var(--lit) 35%,transparent);transform:scale(1)}}
+.boot .dotw{align-self:center;margin:0 0 16px}
+.dots-line{display:flex;align-items:baseline;gap:8px;margin-top:14px;font-size:15px}.dots-line .sp2{color:var(--tx3);font-size:13px}

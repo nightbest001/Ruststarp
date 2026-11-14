@@ -127,6 +127,15 @@ fn settings_to_json(s: &Settings) -> Value {
         "show_account_on_rich_presence": s.show_account_on_rich_presence,
         "keep_in_tray": s.keep_in_tray,
         "multi_instance": s.multi_instance,
+        "layout_columns": s.layout_columns,
+        "layout_gap": s.layout_gap,
+        "layout_borderless": s.layout_borderless,
+        "layout_auto": s.layout_auto,
+        "max_alts": s.max_alts,
+        "max_alts_trim": s.max_alts_trim,
+        "anti_afk": s.anti_afk,
+        "anti_afk_minutes": s.anti_afk_minutes,
+        "anti_afk_action": s.anti_afk_action,
         "show_cpu": s.show_cpu,
         "show_gpu": s.show_gpu,
         "show_ram": s.show_ram,
@@ -156,6 +165,24 @@ fn apply_settings_json(s: &mut Settings, v: &Value) {
     s.show_account_on_rich_presence = b("show_account_on_rich_presence", s.show_account_on_rich_presence);
     s.keep_in_tray = b("keep_in_tray", s.keep_in_tray);
     s.multi_instance = b("multi_instance", s.multi_instance);
+    if let Some(n) = v.get("layout_columns").and_then(Value::as_u64) {
+        s.layout_columns = (n as u32).min(12);
+    }
+    if let Some(n) = v.get("layout_gap").and_then(Value::as_u64) {
+        s.layout_gap = (n as u32).min(64);
+    }
+    s.layout_borderless = b("layout_borderless", s.layout_borderless);
+    s.layout_auto = b("layout_auto", s.layout_auto);
+    s.max_alts = b("max_alts", s.max_alts);
+    s.max_alts_trim = b("max_alts_trim", s.max_alts_trim);
+    s.anti_afk = b("anti_afk", s.anti_afk);
+    if let Some(n) = v.get("anti_afk_minutes").and_then(Value::as_u64) {
+        s.anti_afk_minutes = (n as u32).clamp(1, 19);
+    }
+    s.anti_afk_action = st("anti_afk_action", &s.anti_afk_action.clone());
+    if !matches!(s.anti_afk_action.as_str(), "nudge" | "space" | "zoom") {
+        s.anti_afk_action = "nudge".to_string();
+    }
     s.show_cpu = b("show_cpu", s.show_cpu);
     s.show_gpu = b("show_gpu", s.show_gpu);
     s.show_ram = b("show_ram", s.show_ram);
@@ -228,9 +255,10 @@ fn init_json(mode: Mode) -> Value {
     let flags = if mode == Mode::Settings { flags_to_json(&app::fast_flags().prop) } else { json!({}) };
     let font = if mode == Mode::Settings { crate::fonts::state_json() } else { json!({}) };
     let accounts = if mode == Mode::Settings { accounts::list_json() } else { json!([]) };
+    let groups = if mode == Mode::Settings { accounts::groups_json() } else { json!([]) };
     // `ruststrap -menu accounts` (the tray menu) opens the settings window on that page
     let start_page = app::launch_opt().and_then(|l| l.data("menu")).unwrap_or("").to_string();
-    let account_last = json!({"place": settings.account_place, "job": settings.account_job});
+    let account_last = json!({"place": settings.account_place, "job": settings.account_job, "follow": settings.account_follow});
     json!({
         "mode": mode.name(),
         "name": PROJECT_NAME,
@@ -245,6 +273,7 @@ fn init_json(mode: Mode) -> Value {
         "lowspec_flags": fast_flags::LOW_SPEC_FLAGS.iter().map(|(k, v)| json!([k, v])).collect::<Vec<_>>(),
         "font": font,
         "accounts": accounts,
+        "groups": groups,
         "start_page": start_page,
         "account_last": account_last,
         "shortcuts": sc,
@@ -476,9 +505,23 @@ fn handle(mode: Mode, proxy: &EventLoopProxy<UserEvent>, cmd: &str, a: &Value) -
             Ok(Value::Null)
         }
         "account_check" => accounts::check(arg_u64(a, "user_id")).map(Value::Bool),
-        "account_launch" => {
-            accounts::launch(arg_u64(a, "user_id"), arg_str(a, "place"), arg_str(a, "job"))?;
+        "groups_list" => Ok(accounts::groups_json()),
+        "group_save" => {
+            let members: Vec<u64> = a.get("members").and_then(Value::as_array).map(|v| v.iter().filter_map(Value::as_u64).collect()).unwrap_or_default();
+            accounts::group_save(arg_u64(a, "id"), arg_str(a, "name"), &members, arg_str(a, "place"), arg_str(a, "job"), arg_str(a, "follow"))
+        }
+        "group_remove" => {
+            accounts::group_remove(arg_u64(a, "id"));
             Ok(Value::Null)
+        }
+        "group_launch" => accounts::group_launch(arg_u64(a, "id"), arg_str(a, "place"), arg_str(a, "job"), arg_str(a, "follow")).map(|n| json!(n)),
+        "account_launch" => {
+            accounts::launch(arg_u64(a, "user_id"), arg_str(a, "place"), arg_str(a, "job"), arg_str(a, "follow"))?;
+            Ok(Value::Null)
+        }
+        "layout_arrange" => {
+            let cfg = crate::layout::Config::from_settings(&app::settings().prop);
+            crate::layout::arrange(&cfg).map(|n| json!(n))
         }
         "launch" => {
             let arg = arg_str(a, "arg");
@@ -555,7 +598,7 @@ fn geometry(mode: Mode) -> (f64, f64, f64, f64, bool) {
     match mode {
         Mode::Settings => (1000.0, 580.0, 900.0, 480.0, true),
         Mode::Home => (580.0, 340.0, 580.0, 340.0, false),
-        Mode::Launch(_) => (500.0, 280.0, 500.0, 280.0, false),
+        Mode::Launch(_) => (500.0, 320.0, 500.0, 320.0, false),
         Mode::Setup => (840.0, 540.0, 840.0, 460.0, true),
     }
 }

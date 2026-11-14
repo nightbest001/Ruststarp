@@ -103,6 +103,27 @@ window.Expander=function(o){
   return el};
 window.Hyperlink=function(ic,label,onclick){if(typeof onclick==='string'){const u=onclick;onclick=()=>openUrl(u)}return h('div',{class:'hl',tabindex:0,onclick},ic?icon(ic):null,h('span',null,label))};
 
+/* ---- dot progress: a grid of dots that light up as the download goes on (set(null) = waiting, wave) ---- */
+window.DotProgress=function(o){
+  o=o||{};const cols=o.cols||12,rows=o.rows||6,n=cols*rows;
+  const el=h('div',{class:'dots'});
+  el.style.setProperty('--cols',cols);el.style.setProperty('--ds',(o.size||10)+'px');el.style.setProperty('--dg',(o.gap||14)+'px');
+  /* the same scattered order every time: dot i lights up when progress passes rank[i] */
+  let seed=7;const rnd=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
+  const order=[];for(let i=0;i<n;i++)order.push(i);
+  for(let i=n-1;i>0;i--){const j=Math.floor(rnd()*(i+1));const x=order[i];order[i]=order[j];order[j]=x}
+  const rank=new Array(n);order.forEach((idx,r)=>rank[idx]=r);
+  const dots=[];
+  for(let i=0;i<n;i++){const d=h('i',{class:'d'});d.style.setProperty('--w',(((i%cols)+Math.floor(i/cols))*0.07).toFixed(2)+'s');dots.push(d);el.append(d)}
+  el.set=function(f){
+    if(f==null){el.classList.add('ind');dots.forEach(d=>d.classList.remove('on','next'));return el}
+    el.classList.remove('ind');f=Math.max(0,Math.min(1,f));
+    const lit=Math.floor(f*n+1e-9);
+    dots.forEach((d,i)=>{const r=rank[i];d.classList.toggle('on',r<lit);d.classList.toggle('next',f<1&&r>=lit&&r<lit+3)});
+    return el};
+  el.fail=function(on){el.classList.toggle('err',!!on);return el};
+  el.set(null);return el};
+
 /* ---- reactive registry (per view) ---- */
 let regs=[];window.reg=f=>{regs.push(f)};window.clearRegs=()=>{regs=[]};
 let touchCb=null;window.onTouch=f=>{touchCb=f};

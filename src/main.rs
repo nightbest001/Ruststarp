@@ -19,6 +19,7 @@
 compile_error!("Ruststrap only supports Windows.");
 
 mod accounts;
+mod anti_afk;
 mod activity_watcher;
 mod app;
 mod bootstrapper;
@@ -33,8 +34,10 @@ mod gpu;
 mod installer;
 mod json_manager;
 mod lang;
+mod layout;
 mod launch_settings;
 mod logger;
+mod max_alts;
 mod login;
 mod memory;
 mod menu;
